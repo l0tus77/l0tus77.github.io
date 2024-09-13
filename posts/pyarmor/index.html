@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en-us"><head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+   <meta name="description" content="
+Introduction
+Dans cet article, je vais vous expliquer comment j&rsquo;ai réussi à obtenir la version premium d&rsquo;un bot Dokkan Battle que j&rsquo;ai trouvé sur internet et sans payer.
+Le programme est un executable windows protégé par PyArmor (v8.5.10).
+Avertissement
+Les informations et techniques présentées dans cet article sont fournies à des fins éducatives uniquement. Je décline toute responsabilité quant à l&rsquo;utilisation de ces informations à des fins autres que celles de l&rsquo;apprentissage et de la compréhension. Veuillez respecter toutes les lois et règlements applicables.">  
+
+  <title>
+    
+      Reversing a PyArmor-protected Windows executable
+    
+  </title>
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/" />
+  
+  
+  
+  <link rel="stylesheet" href="/css/main.ae0e4ff1c523b2a40ae2e11e7ed575aade57924f71d17b49002a29333709abf5f9471ba57824841efbe3c1298276a21f30857eb529a8246d4b0b0d05f2066b01.css" integrity="sha512-rg5P8cUjsqQK4uEeftV1qt5Xkk9x0XtJACopMzcJq/X5RxuleCSEHvvjwSmCdqIfMIV&#43;tSmoJG1LCw0F8gZrAQ==" />
+  
+</head>
+<body a="auto">
+        <main class="page-content" aria-label="Content">
+            <div class="w">
+<a href="/">..</a>
+
+
+<article>
+    <p class="post-meta">
+        <time datetime="2024-09-13 13:56:56 &#43;0200 CEST">
+            2024-09-13
+        </time>
+    </p>
+
+    <h1>Reversing a PyArmor-protected Windows executable</h1>
+
+    
+
+    <p><img src="/images/pyarmor_0.png" alt=""></p>
+<h2 id="introduction">Introduction</h2>
+<p>Dans cet article, je vais vous expliquer comment j&rsquo;ai réussi à obtenir la version premium d&rsquo;un bot Dokkan Battle que j&rsquo;ai trouvé sur internet et sans payer.</p>
+<p>Le programme est un executable windows protégé par <a href="https://github.com/dashingsoft/pyarmor">PyArmor</a> (v8.5.10).</p>
+<h2 id="avertissement">Avertissement</h2>
+<p>Les informations et techniques présentées dans cet article sont fournies à des fins éducatives uniquement. Je décline toute responsabilité quant à l&rsquo;utilisation de ces informations à des fins autres que celles de l&rsquo;apprentissage et de la compréhension. Veuillez respecter toutes les lois et règlements applicables.</p>
+<h2 id="etapes-dexploitation">Etapes d&rsquo;exploitation</h2>
+<h3 id="analyse-du-programme">Analyse du programme</h3>
+<p>On peut voir à l&rsquo;aide de <a href="https://github.com/horsicq/Detect-It-Easy">Detect It Easy</a> que le programme est packé avec PyInstaller (globalement un outil pour créer des executables autonomes à partir de fichiers .py).</p>
+<p><img src="/images/pyarmor_1.png" alt=""></p>
+<p>Nous pouvons donc utiliser <a href="https://github.com/extremecoders-re/pyinstxtractor">pyinstxtrator</a> pour extraire tous les fichiers de l&rsquo;archive pyinstaller.</p>
+<p>ATTENTION : IL FAUT UTILISER LA MÊME VERSION DE PYTHON QUE CELLE DU BINAIRE.</p>
+<pre tabindex="0"><code>[+] Processing Dokkan-FarmBot.exe
+[+] Pyinstaller version: 2.1+
+[+] Python version: 3.10
+[+] Length of package: 174643443 bytes
+[+] Found 8081 files in CArchive
+[+] Beginning extraction...please standby
+[+] Possible entry point: pyiboot01_bootstrap.pyc
+[+] Possible entry point: pyi_rth_inspect.pyc
+[+] Possible entry point: pyi_rth_pyqt5webengine.pyc
+[+] Possible entry point: pyi_rth_pkgres.pyc
+[+] Possible entry point: pyi_rth_pkgutil.pyc
+[+] Possible entry point: pyi_rth_multiprocessing.pyc
+[+] Possible entry point: pyi_rth_setuptools.pyc
+[+] Possible entry point: pyi_rth__tkinter.pyc
+[+] Possible entry point: pyi_rth_pyqt5.pyc
+[+] Possible entry point: main.pyc
+[+] Found 2987 files in PYZ archive
+[+] Successfully extracted pyinstaller archive: Dokkan-FarmBot.exe
+</code></pre><p>L&rsquo;extraction a réussi, on peut donc aller dans le dossier <strong>Dokkan-FarmBot.exe_extracted</strong> pour voir ce qu&rsquo;il contient.</p>
+<p>On peut voir que pyinstxtrator a réussi à reconstruire le fichier <strong>main.py</strong> qui est l&rsquo;entry point de notre programme.</p>
+<p>Ce fichier est protégé à l&rsquo;aide de PyArmor :</p>
+<pre tabindex="0"><code>from pyarmor_runtime_004676 import __pyarmor__
+__pyarmor__(__name__, __file__, b&#39;PY004676\x00\x03\n\x00o\r\r\n\x80\x00\x01\x00\x0.......
+</code></pre><p>On peut essayer de le lancer directement.</p>
+<pre tabindex="0"><code>&gt; python main.py
+Traceback (most recent call last):
+  File &#34;C:\Users\&lt;USER&gt;\Desktop\DokkanReverse\Dokkan-FarmBot.exe_extracted\main.py&#34;, line 1, in &lt;module&gt;
+    from pyarmor_runtime_004676 import __pyarmor__
+ImportError: cannot import name &#39;__pyarmor__&#39; from &#39;pyarmor_runtime_004676&#39; (unknown location)
+</code></pre><p>On ne peut pas lancer le programme directement, il va falloir modifier un peu la structure du projet extrait pour pouvoir le lancer.</p>
+<h3 id="reconstruction-du-projet">Reconstruction du projet</h3>
+<p>Le dossier <strong>pyarmor_runtime_004676</strong> existe bien mais on dirait que notre programme main n&rsquo;arrive pas à importer son contenu, il doit manquer des fichiers.</p>
+<p>Si on regarde dans le dossier <strong>PYZ-00.pyz_extracted</strong> puis dans le dossier <strong>pyarmor_runtime_004676</strong>, on voit qu&rsquo;il y a un fichier <strong>__init__.pyc</strong>.</p>
+<p>On peut glisser ce fichier dans le dossier <strong>pyarmor_runtime_004676</strong> qui ne le contient pas et on relance le programme.</p>
+<pre tabindex="0"><code>&gt; python main.py
+C:/Users/&lt;USER&gt;/AppData/Local/Programs/Python/Python310/tcl/tcl8.6/init.tcl: version conflict for package &#34;Tcl&#34;: have 8.6.12, need exactly 8.6.10
+version conflict for package &#34;Tcl&#34;: have 8.6.12, need exactly 8.6.10
+    while executing
+&#34;package require -exact Tcl 8.6.10&#34;
+    (file &#34;C:/Users/&lt;USER&gt;/AppData/Local/Programs/Python/Python310/tcl/tcl8.6/init.tcl&#34; line 19)
+    invoked from within
+&#34;source C:/Users/&lt;USER&gt;/AppData/Local/Programs/Python/Python310/tcl/tcl8.6/init.tcl&#34;
+    (&#34;uplevel&#34; body line 1)
+    invoked from within
+&#34;uplevel #0 [list source $tclfile]&#34;
+</code></pre><p>L&rsquo;erreur précédente a disparu mais maintenant nous avons un problème de compatibilité de version de Tcl (utilisé par tkinter).</p>
+<p>Il suffit d&rsquo;aller dans le fichier <strong>C:/Users/&lt;USER&gt;/AppData/Local/Programs/Python/Python310/tcl/tcl8.6/init.tcl</strong> et de commenter cette ligne (avec un # avant) :</p>
+<pre tabindex="0"><code>package require -exact Tcl 8.6.10
+</code></pre><p>On peut réessayer de lancer le programme.</p>
+<pre tabindex="0"><code>&gt; python main.py
+</code></pre><p>Aucune erreur et une fenêtre s&rsquo;ouvre pour nous demander la version à utiliser.</p>
+<p><img src="/images/pyarmor_2.png" alt=""></p>
+<p>On clique sur Global :</p>
+<pre tabindex="0"><code>Program crashed : [Errno 2] No such file or directory: &#39;config_gb.json&#39;
+</code></pre><p>Il ne faut pas oublier de mettre les fichiers qui étaient à côté du .exe dans le dossier qui contient maintenant le main.py</p>
+<p>Une fois les fichiers déplacés, le programme fonction correctement et nous pouvons commencer l&rsquo;exploitation.</p>
+<h3 id="trouver-une-méthode-dexploitation">Trouver une méthode d&rsquo;exploitation</h3>
+<p>Pour trouver une méthode d&rsquo;exploitation, je vais analyser le comportement du programme pour essayer de savoir comment il fonctionne.
+Une fois le programme lancé, on peut voir cette interface :</p>
+<p><img src="/images/pyarmor_3.png" alt=""></p>
+<p>On voit que le programme a détecté que je suis sur la version gratuite et ma première idée fut que le programme fait une requête HTTP pour savoir si je suis premium ou non.</p>
+<p>Pour vérifier on peut utiliser une méthode qui se nomme <strong>Library Hijacking</strong>.</p>
+<p><strong>POINT IMPORTANT :</strong> Cette méthode ne marche que dans certains conditions et le fait d&rsquo;avoir désempaqueté le .exe  permet d&rsquo;utiliser les librairies python installées sur mon ordinateur, plutôt que les librairies compilées contenues dans le .exe.</p>
+<p>Je me suis donc penché vers une des librairies les plus utilisées pour faire des requêtes HTTP en python : <a href="https://pypi.org/project/requests/">requests</a>.</p>
+<p>On peut donc vérifier si cette méthode va marcher en modifiant la librairie requests pour afficher le contenu des requêtes HTTP envoyées.</p>
+<p>Pour ce faire je me rends ici : <strong>C:\Users\&lt;USER&gt;\AppData\Local\Programs\Python\Python310\Lib\site-packages\requests</strong> et je cherche la méthode utilisée pour envoyer des requêtes HTTP.</p>
+<p>Dans le fichier <strong>sessions.py</strong> on peut apercevoir cette méthode :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">def</span>  <span style="color:#a6e22e">request</span>(
+</span></span><span style="display:flex;"><span>self,
+</span></span><span style="display:flex;"><span>method,
+</span></span><span style="display:flex;"><span>url,
+</span></span><span style="display:flex;"><span>params<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>data<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>headers<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>cookies<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>files<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>auth<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>timeout<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>allow_redirects<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>,
+</span></span><span style="display:flex;"><span>proxies<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>hooks<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>stream<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>verify<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>cert<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>json<span style="color:#f92672">=</span><span style="color:#66d9ef">None</span>,
+</span></span><span style="display:flex;"><span>):
+</span></span></code></pre></div><p>Pour vérifier si c&rsquo;est la bonne méthode, je vais ajouter ce code avant le retour de la fonction :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;[REQUEST]&#34;</span>)
+</span></span><span style="display:flex;"><span>print(url)
+</span></span><span style="display:flex;"><span>print(req<span style="color:#f92672">.</span>headers)
+</span></span><span style="display:flex;"><span>print(req<span style="color:#f92672">.</span>params)
+</span></span><span style="display:flex;"><span>print(req<span style="color:#f92672">.</span>json)
+</span></span></code></pre></div><p>Et je vais relancer le programme :</p>
+<pre tabindex="0"><code>&gt; python main.py
+[REQUEST]
+https://[REDACTED].herokuapp.com/device_token/jp
+{&#39;Authorization&#39;: &#39;Bearer [REDACTED]&#39;}
+{}
+{&#39;data&#39;: &#39;fab039758e93aa52c06d29c5211b56e291f41328d4106222cd8c6f12a24ef248205e39cd1bdd9d73b39334b9c234c764f28beb10368bb5ef3bfc6557f8034fe682bd4ced1576573e1205b4aeeb81de5f1c8000a5d93bcf52bda0257768c3895a73ff105e26e38c0c5f965a2a674db468ad6ff8f9579ec1865d569bcdeb9e8b5b07ad19aa426701effcf7c0a595b624926ae6689418b7988ed3fd2fb95bc16946f9c0c852b7b5e755327a1f41fffb&#39;, &#39;signature&#39;: &#39;a253161be4e859dd7bc87ecb19aa68dd637ee46aa2b049b20d7a1ea3e281d9c6&#39;}
+
+[REQUEST]
+https://[REDACTED].herokuapp.com/is_member_check
+{&#39;Authorization&#39;: &#39;Bearer [REDACTED]&#39;}
+{}
+{&#39;data&#39;: &#39;fab039758e93aa52c06d29c5211b56e291f41328d4106222cd8c6f12a24ef248205e39cd1bdd9d73b39334b9c234c764f28beb10368bb5ef3bfc6557f8034fe682bd4ced1576573e1205b4aeeb81de5f1c8000a5d93bcf52bda0257768c3895a73ff105e26e38c0c5f965a2a674db468ad6ff8f9579ec1865d569bcdeb9e8b5b07ad19aa426701effcf7c0a595b624926ae6689418b7988ed3fd2fb95bc16946f9c0c852b7b5e755327a1f41fe20&#39;, &#39;signature&#39;: &#39;98bae068a05dad8796ee4567af4b53e12444c364d1197ad72997f1493c3535e5&#39;}
+
+[REQUEST]
+https://[REDACTED].herokuapp.com/is_premium_member
+{&#39;Authorization&#39;: &#39;Bearer [REDACTED]&#39;}
+{}
+{&#39;data&#39;: &#39;fab039758e93aa52c06d29c5211b56e291f41328d4106222cd8c6f12a24ef248205e39cd1bdd9d73b39334b9c234c764f28beb10368bb5ef3bfc6557f8034fe682bd4ced1576573e1205b4aeeb81de5f1c8000a5d93bcf52bda0257768c3895a73ff105e26e38c0c5f965a2a674db468ad6ff8f9579ec1865d569bcdeb9e8b5b07ad19aa426701effcf7c0a595b624926ae6689418b7988ed3fd2fb95bc16946f9c0c852b7b5e755327a1f41fe20&#39;, &#39;signature&#39;: &#39;98bae068a05dad8796ee4567af4b53e12444c364d1197ad72997f1493c3535e5&#39;}
+</code></pre><p>On peut voir que la méthode <strong>Library Hijacking</strong> fonctionne ! Et on va pouvoir l&rsquo;utiliser.</p>
+<h3 id="exploitation-library-hijacking">Exploitation Library Hijacking</h3>
+<p>On peut voir qu&rsquo;il y a une requête effectuée sur l&rsquo;endpoint <code>is_member_check</code> puis sur l&rsquo;endpoint <code>is_premium_member</code> mais les données envoyées sont chiffrées (surement avec l&rsquo;algorithme RSA) et donc il théoriquement impossible de renvoyer des données disant que notre compte est premium car la clé privée pour chiffrer ces données doit se trouver sur le serveur).</p>
+<p>On peut alors essayer d&rsquo;inspecter la stack du programme au moment de la requête vers l&rsquo;endpoint <code>is_member_check</code> pour savoir ce qu&rsquo;il se passe.</p>
+<p>On ajoute donc ce code python dans la méthode <strong>send</strong> de la librairie requests :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> req<span style="color:#f92672">.</span>url <span style="color:#f92672">==</span>  <span style="color:#e6db74">&#34;https://[REDACRED]/is_member_check&#34;</span>:
+</span></span><span style="display:flex;"><span>	<span style="color:#f92672">import</span> inspect <span style="color:#75715e"># Utilisation du module inspect pour analyser la stack</span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">for</span> frame <span style="color:#f92672">in</span> inspect<span style="color:#f92672">.</span>stack(): <span style="color:#75715e"># Boucler sur la stack</span>
+</span></span><span style="display:flex;"><span>		print(frame<span style="color:#f92672">.</span>function) <span style="color:#75715e"># Afficher la fonction de la frame</span>
+</span></span></code></pre></div><p>On relance le programme :</p>
+<pre tabindex="0"><code>&gt; python main.py
+[REQUEST]
+https://[REDACTED]/is_member_check
+{&#39;Authorization&#39;: &#39;Bearer [REDACTED]&#39;}
+{}
+{&#39;data&#39;: &#39;fab039758e93aa52c06d29c5211b56e291f41328d4106222cd8c6f12a24ef248205e39cd1bdd9d73b39334b9c234c764f28beb10368bb5ef3bfc6557f8034fe682bd4ced1576573e1205b4aeeb81de5f1c8000a5d93bcf52bda0257768c3895a73ff105e26e38c0c5f965a2a674db468ad6ff8f9579ec1865d569bcdeb9e8b5b07ad19aa426701effcf7c0a595b624926ae6689418b7988ed3fd2fb95bc16946f9c0c852b7b5e755327889f25f87&#39;, &#39;signature&#39;: &#39;c82234f214af30aef855f22a97894bfc1e6d9e8ff4ed530dc896790f50a51134&#39;}
+
+request
+post
+is_guild_member
+isOnServer
+start
+&lt;module&gt;
+&lt;module&gt;
+</code></pre><p>On peut voir que dans une des frame se trouve la fonction <code>isOnServer</code> et c&rsquo;est surement celle qui initie la requête vers l&rsquo;endpoint <code>is_member_check</code>. On peut donc modifier le code python pour l&rsquo;analyser en profondeur :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> req<span style="color:#f92672">.</span>url <span style="color:#f92672">==</span>  <span style="color:#e6db74">&#34;https://[REDACTED]/is_member_check&#34;</span>:
+</span></span><span style="display:flex;"><span>	<span style="color:#f92672">import</span> inspect
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">for</span> frame <span style="color:#f92672">in</span> inspect<span style="color:#f92672">.</span>stack():
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">if</span> frame<span style="color:#f92672">.</span>function <span style="color:#f92672">==</span>  <span style="color:#e6db74">&#34;isOnServer&#34;</span>:
+</span></span><span style="display:flex;"><span>			current_variables <span style="color:#f92672">=</span> frame<span style="color:#f92672">.</span>frame<span style="color:#f92672">.</span>f_locals <span style="color:#75715e"># local namespace seen by this frame</span>
+</span></span><span style="display:flex;"><span>			print(current_variables)
+</span></span></code></pre></div><p>On relance le programme :</p>
+<pre tabindex="0"><code>&gt; python main.py
+{&#39;self&#39;: &lt;startup._Startup object at 0x0000021B41191DE0&gt;, &#39;_var_var_17&#39;: False}
+</code></pre><p>On peut voir grâce à la f_local <strong>self</strong> que la méthode <code>isOnServer</code> doit se trouver dans une classe.</p>
+<p>On peut donc récupérer une instance de cette classe et l&rsquo;analyser en modifiant le code python comme ceci :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> req<span style="color:#f92672">.</span>url <span style="color:#f92672">==</span>  <span style="color:#e6db74">&#34;https://[REDACTED]/is_member_check&#34;</span>:
+</span></span><span style="display:flex;"><span>	<span style="color:#f92672">import</span> inspect
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">for</span> frame <span style="color:#f92672">in</span> inspect<span style="color:#f92672">.</span>stack():
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">if</span> frame<span style="color:#f92672">.</span>function <span style="color:#f92672">==</span>  <span style="color:#e6db74">&#34;isOnServer&#34;</span>:
+</span></span><span style="display:flex;"><span>			current_variables <span style="color:#f92672">=</span> frame<span style="color:#f92672">.</span>frame<span style="color:#f92672">.</span>f_locals
+</span></span><span style="display:flex;"><span>			self_instance <span style="color:#f92672">=</span> current_variables[<span style="color:#e6db74">&#34;self&#34;</span>] <span style="color:#75715e"># Récupération d&#39;une instance de self</span>
+</span></span><span style="display:flex;"><span>			print(dir(self_instance)) <span style="color:#75715e"># Affichage de cette instance</span>
+</span></span></code></pre></div><p>On relance le programme :</p>
+<pre tabindex="0"><code>&gt; python main.py
+[&#39;__class__&#39;, &#39;__delattr__&#39;, &#39;__dict__&#39;, &#39;__dir__&#39;, &#39;__doc__&#39;, &#39;__eq__&#39;, &#39;__format__&#39;, &#39;__ge__&#39;, &#39;__getattribute__&#39;, &#39;__gt__&#39;, &#39;__hash__&#39;, &#39;__init__&#39;, &#39;__init_subclass__&#39;, &#39;__le__&#39;, &#39;__lt__&#39;, &#39;__module__&#39;, &#39;__ne__&#39;, &#39;__new__&#39;, &#39;__reduce__&#39;, &#39;__reduce_ex__&#39;, &#39;__repr__&#39;, &#39;__setattr__&#39;, &#39;__sizeof__&#39;, &#39;__str__&#39;, &#39;__subclasshook__&#39;, &#39;__weakref__&#39;, &#39;account_link_ctrl&#39;, &#39;account_manager&#39;, &#39;base_url&#39;, &#39;check_bot_status&#39;, &#39;check_bot_update&#39;, &#39;check_bot_version&#39;, &#39;check_version_status&#39;, &#39;client_config&#39;, &#39;cmd_excutor&#39;, &#39;cryption_client&#39;, &#39;execute_command&#39;, &#39;execute_custom_commands&#39;, &#39;execute_obfuscated_function&#39;, &#39;firebase&#39;, &#39;firebase_login&#39;, &#39;game_client&#39;, &#39;get_obfuscated_function&#39;, &#39;headers&#39;, &#39;init_bot_checks&#39;, &#39;isOnServer&#39;, &#39;isPremium&#39;, &#39;isServerBooster&#39;, &#39;is_valid_user&#39;, &#39;local_version&#39;, &#39;platform&#39;, &#39;pypresence&#39;, &#39;pypresence_state&#39;, &#39;query_client&#39;, &#39;select_language&#39;, &#39;select_platform&#39;, &#39;select_version&#39;, &#39;start&#39;, &#39;version&#39;, &#39;xor_encrypt_decrypt&#39;]
+</code></pre><p>On peut voir que cette classe contient différentes fonctions notamment la fonction <code>isPremium</code> :D</p>
+<p>Comme l&rsquo;instance qu&rsquo;on a récupéré agit comme un pointeur, on peut essayer de modifier la fonction <code>isPremium</code> avant qu&rsquo;elle soit appelée pour qu&rsquo;elle retourne <strong>True</strong>.</p>
+<p>On ajoute ce code au début du fichier <strong>sessions.py</strong> :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">def</span>  <span style="color:#a6e22e">fake_ispremium</span>(cls, <span style="color:#f92672">*</span>args, <span style="color:#f92672">**</span>kwargs):
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#34;FONCTION IsPremium appelée par le programme&#34;</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">return</span>  <span style="color:#66d9ef">True</span>
+</span></span></code></pre></div><p>Et dans notre méthode <strong>send</strong> :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> req<span style="color:#f92672">.</span>url <span style="color:#f92672">==</span>  <span style="color:#e6db74">&#34;https://[REDACTED]/is_member_check&#34;</span>:
+</span></span><span style="display:flex;"><span>	<span style="color:#f92672">import</span> inspect
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">for</span> frame <span style="color:#f92672">in</span> inspect<span style="color:#f92672">.</span>stack():
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">if</span> frame<span style="color:#f92672">.</span>function <span style="color:#f92672">==</span>  <span style="color:#e6db74">&#34;isOnServer&#34;</span>:
+</span></span><span style="display:flex;"><span>			current_variables <span style="color:#f92672">=</span> frame<span style="color:#f92672">.</span>frame<span style="color:#f92672">.</span>f_locals
+</span></span><span style="display:flex;"><span>			self_instance <span style="color:#f92672">=</span> current_variables[<span style="color:#e6db74">&#34;self&#34;</span>]
+</span></span><span style="display:flex;"><span>			self_instance<span style="color:#f92672">.</span>__class__<span style="color:#f92672">.</span>isPremium <span style="color:#f92672">=</span>  classmethod(fake_ispremium) <span style="color:#75715e"># On remplace la méthode originale par la notre</span>
+</span></span></code></pre></div><p>On relance le programme :</p>
+<pre tabindex="0"><code>&gt; python main.py
+FONCTION IsPremium appelée par le programme
+
+-----------------------------------------------------------------
+SMILE free version
+-------------------------USER SETTINGS-------------------------
++ - Preferences
+-------------------------BOT TUTORIAL-------------------------
+0 - Bot guide
+-------------------------SIGN IN OPTIONS-------------------------
+1 - Create account
+2 - Facebook login
+3 - Google login (ios only!)
+4 - Save login
+5 - Identifier login
+-------------------------BOT SETTINGS-------------------------
+6 - Change version and platform
+-------------------------MEMBERSHIPS-------------------------
+7 - Premium subscription
+-------------------------COMMANDS MAPPING-------------------------
+8 - Commands set file on all accounts
+------------------------------------------------------------
+Option:
+</code></pre><p>On a réussi à remplacer la méthode <code>isPremium</code> de la classe mais on voit que nous ne sommes pas premium pour autant sur le bot.</p>
+<p>J&rsquo;ai donc pensé que la méthode <code>isPremium</code> ne retournait pas une valeur mais définissait plutôt un attribut d&rsquo;instance comme par exemple <code>self.ispremium = result</code> qui était utilisé ailleurs dans le programme.</p>
+<p>Pour vérifier, nous allons devoir récupérer les attributs d&rsquo;instance de la classe en modifiant notre code comme ceci :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> req<span style="color:#f92672">.</span>url <span style="color:#f92672">==</span>  <span style="color:#e6db74">&#34;https://dokkan-smile-api-cdf807e32be6.herokuapp.com/is_member_check&#34;</span>:
+</span></span><span style="display:flex;"><span>	<span style="color:#f92672">import</span> inspect
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">for</span> frame <span style="color:#f92672">in</span> inspect<span style="color:#f92672">.</span>stack():
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">if</span> frame<span style="color:#f92672">.</span>function <span style="color:#f92672">==</span>  <span style="color:#e6db74">&#34;isOnServer&#34;</span>:
+</span></span><span style="display:flex;"><span>			current_variables <span style="color:#f92672">=</span> frame<span style="color:#f92672">.</span>frame<span style="color:#f92672">.</span>f_locals
+</span></span><span style="display:flex;"><span>			self_instance <span style="color:#f92672">=</span> current_variables[<span style="color:#e6db74">&#34;self&#34;</span>]
+</span></span><span style="display:flex;"><span>			instance_vars <span style="color:#f92672">=</span> self_instance<span style="color:#f92672">.</span>__dict__
+</span></span><span style="display:flex;"><span>			print(<span style="color:#e6db74">&#34;Attributs d&#39;instance :&#34;</span>)
+</span></span><span style="display:flex;"><span>			<span style="color:#66d9ef">for</span> attr, value <span style="color:#f92672">in</span> instance_vars<span style="color:#f92672">.</span>items():
+</span></span><span style="display:flex;"><span>				print(<span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{</span>attr<span style="color:#e6db74">}</span><span style="color:#e6db74">: </span><span style="color:#e6db74">{</span>value<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>)
+</span></span><span style="display:flex;"><span>			self_instance<span style="color:#f92672">.</span>__class__<span style="color:#f92672">.</span>isPremium <span style="color:#f92672">=</span>  classmethod(fake_ispremium)
+</span></span></code></pre></div><p>On relance le programme :</p>
+<pre tabindex="0"><code>&gt; python main.py
+Attributs d&#39;instance :
+version: gb
+firebase: &lt;Auth.smileClient.AuthSession object at 0x0000029D4B195780&gt;
+client_config: &lt;Services.settings.Settings object at 0x0000029D4B1956F0&gt;
+base_url: [REDACTED]
+headers: {&#39;Cache-Control&#39;: &#39;no-cache&#39;, &#39;Authorization&#39;: &#39;[REDACTED]&#39;}
+local_version: 2.1.5-093ae3875eb8wef2ac1be0888ca85cdb9
+pypresence_state: &lt;Services.pypre.DiscordRichPresence object at 0x0000029D4B196320&gt;
+query_client: &lt;Services.queryClient.QueryClient object at 0x0000029D4B1975B0&gt;
+cryption_client: &lt;Cryption.cryption.EncryptionUtils object at 0x0000029D4B197C40&gt;
+game_client: &lt;Services.dokkan.Dokkan object at 0x0000029D4B197070&gt;
+account_link_ctrl: &lt;Services.account_linking.AccountLinking object at 0x0000029D4B197DC0&gt;
+platform: ios
+</code></pre><p>On ne voit pas d&rsquo;attribut lié au premium mais on peut voir l&rsquo;attribut <code>client_config</code> qui semble intéressant et qu&rsquo;on peut surement inspecter comme ceci :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> req<span style="color:#f92672">.</span>url <span style="color:#f92672">==</span>  <span style="color:#e6db74">&#34;https://[REDACTED]/is_member_check&#34;</span>:
+</span></span><span style="display:flex;"><span>	<span style="color:#f92672">import</span> inspect
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">for</span> frame <span style="color:#f92672">in</span> inspect<span style="color:#f92672">.</span>stack():
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">if</span> frame<span style="color:#f92672">.</span>function <span style="color:#f92672">==</span>  <span style="color:#e6db74">&#34;isOnServer&#34;</span>:
+</span></span><span style="display:flex;"><span>			current_variables <span style="color:#f92672">=</span> frame<span style="color:#f92672">.</span>frame<span style="color:#f92672">.</span>f_locals
+</span></span><span style="display:flex;"><span>			self_instance <span style="color:#f92672">=</span> current_variables[<span style="color:#e6db74">&#34;self&#34;</span>]
+</span></span><span style="display:flex;"><span>			instance_vars <span style="color:#f92672">=</span> self_instance<span style="color:#f92672">.</span>__dict__
+</span></span><span style="display:flex;"><span>			client_config <span style="color:#f92672">=</span> self_instance<span style="color:#f92672">.</span>client_config <span style="color:#75715e"># Recupération de client_config</span>
+</span></span><span style="display:flex;"><span>			<span style="color:#66d9ef">for</span> attr, value <span style="color:#f92672">in</span> client_config<span style="color:#f92672">.</span>__dict__<span style="color:#f92672">.</span>items():
+</span></span><span style="display:flex;"><span>				print(<span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{</span>attr<span style="color:#e6db74">}</span><span style="color:#e6db74">: </span><span style="color:#e6db74">{</span>value<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>) <span style="color:#75715e"># Affichage des éléments de client_config</span>
+</span></span><span style="display:flex;"><span>			self_instance<span style="color:#f92672">.</span>__class__<span style="color:#f92672">.</span>isPremium <span style="color:#f92672">=</span>  classmethod(fake_ispremium)
+</span></span></code></pre></div><p>On relance le programme :</p>
+<pre tabindex="0"><code>&gt; python main.py
+enable_clear_interval_jp: False
+version: gb
+host: [REDACTED]
+game_version: 5.22.1-b029e84a02a88dabba5c66a210d14f9f69c27d69d23d2b13dcdf50b9f660ff6c
+skip_animations: False
+bot_ver: 2.1.5
+botSecurityHash: [REDACTED]
+language: en
+auto_team: True
+refill_stamina_stones: True
+sell_sr_baba: True
+current_account: None
+facebook_id: None
+facebook_token: None
+user_agent: BNGI0221/23052616 CFNetwork/1209 Darwin/20.2.0
+username:
+platform: ios
+AdId: None
+UniqueId: None
+identifier: None
+access_token: None
+secret: None
+deck: 1
+discord: False
+discord_id: None
+premium: False
+is_server_booster: False
+imgur_client_id: b17bdd86298b02f
+imgur_client_secret: [REDACTED]
+webhook_url: https://discord.com/api/webhooks/[REDACTED]
+cryptionClient: &lt;Cryption.cryption.EncryptionUtils object at 0x000001FC3F5C7C10&gt;
+queryClient: &lt;Services.queryClient.QueryClient object at 0x000001FC3F5C7580&gt;
+</code></pre><p>On peut voir que <code>client_config</code> contient un attribut <code>premium</code> qui est défini à <code>False</code>.</p>
+<p>On peut essayer de le modifier à <code>True</code> pour voir ce qu&rsquo;il se passe (et on laisse le remplacement de la méthode <code>IsPremium</code> pour ne pas qu&rsquo;elle le remette à <code>False</code>) :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> req<span style="color:#f92672">.</span>url <span style="color:#f92672">==</span>  <span style="color:#e6db74">&#34;https://[REDACTED]/is_member_check&#34;</span>:
+</span></span><span style="display:flex;"><span>	<span style="color:#f92672">import</span> inspect
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">for</span> frame <span style="color:#f92672">in</span> inspect<span style="color:#f92672">.</span>stack():
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">if</span> frame<span style="color:#f92672">.</span>function <span style="color:#f92672">==</span>  <span style="color:#e6db74">&#34;isOnServer&#34;</span>:
+</span></span><span style="display:flex;"><span>			current_variables <span style="color:#f92672">=</span> frame<span style="color:#f92672">.</span>frame<span style="color:#f92672">.</span>f_locals
+</span></span><span style="display:flex;"><span>			self_instance <span style="color:#f92672">=</span> current_variables[<span style="color:#e6db74">&#34;self&#34;</span>]
+</span></span><span style="display:flex;"><span>			instance_vars <span style="color:#f92672">=</span> self_instance<span style="color:#f92672">.</span>__dict__
+</span></span><span style="display:flex;"><span>			client_config <span style="color:#f92672">=</span> self_instance<span style="color:#f92672">.</span>client_config
+</span></span><span style="display:flex;"><span>			client_config<span style="color:#f92672">.</span>premium <span style="color:#f92672">=</span> <span style="color:#66d9ef">True</span> <span style="color:#75715e"># On passe la variable premium à vrai</span>
+</span></span><span style="display:flex;"><span>			self_instance<span style="color:#f92672">.</span>__class__<span style="color:#f92672">.</span>isPremium <span style="color:#f92672">=</span>  classmethod(fake_ispremium) <span style="color:#75715e"># Remplacement de la méthode isPremium pour qu&#39;elle ne fassee rien</span>
+</span></span></code></pre></div><p>On relance le programme :
+<img src="/images/pyarmor_4.png" alt=""></p>
+<p>Et voila ! Nous avons pu exploiter cette vulnérabilité pour avoir le premium sur ce bot sans payer.</p>
+<h3 id="conclusion">Conclusion</h3>
+<p>PyArmor n&rsquo;est pas quelque chose de très complexe à bypass la plupart du temps, il suffit de comprendre la logique de notre programme et trouver une vulnérabilité à exploiter.</p>
+
+</article>
+
+            </div>
+        </main>
+    </body></html>
