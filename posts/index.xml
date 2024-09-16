@@ -6,8 +6,15 @@
     <description>Recent content in Posts on L0tus Blog</description>
     <generator>Hugo</generator>
     <language>en-us</language>
-    <lastBuildDate>Fri, 13 Sep 2024 13:56:56 +0200</lastBuildDate>
+    <lastBuildDate>Mon, 16 Sep 2024 12:26:56 +0200</lastBuildDate>
     <atom:link href="https://l0tus77.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Bypassing AWS WAF Challenge without Selenium / Capsolver</title>
+      <link>https://l0tus77.github.io/posts/awswaf/</link>
+      <pubDate>Mon, 16 Sep 2024 12:26:56 +0200</pubDate>
+      <guid>https://l0tus77.github.io/posts/awswaf/</guid>
+      <description>&lt;h2 id=&#34;introduction&#34;&gt;Introduction&lt;/h2&gt;&#xA;&lt;p&gt;Dans cet article, je vais vous montrer comment contourner assez simplement le &lt;a href=&#34;https://docs.aws.amazon.com/waf/latest/developerguide/waf-captcha-and-challenge.html&#34;&gt;challenge AWS WAF&lt;/a&gt;. D&amp;rsquo;après la documentation, ce challenge s&amp;rsquo;exécute en silence et permet de vérifier que l&amp;rsquo;utilisateur qui fait des requêtes sur le site utilise un navigateur et n&amp;rsquo;est pas un bot.&lt;/p&gt;&#xA;&lt;h2 id=&#34;avertissement&#34;&gt;Avertissement&lt;/h2&gt;&#xA;&lt;p&gt;Les informations et techniques présentées dans cet article sont fournies à des fins éducatives uniquement. Je décline toute responsabilité quant à l’utilisation de ces informations à des fins autres que celles de l’apprentissage et de la compréhension. Veuillez respecter toutes les lois et règlements applicables.&lt;/p&gt;</description>
+    </item>
     <item>
       <title>Reversing a PyArmor-protected Windows executable</title>
       <link>https://l0tus77.github.io/posts/pyarmor/</link>

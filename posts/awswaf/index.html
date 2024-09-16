@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en-us"><head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+   <meta name="description" content="Introduction
+Dans cet article, je vais vous montrer comment contourner assez simplement le challenge AWS WAF. D&rsquo;après la documentation, ce challenge s&rsquo;exécute en silence et permet de vérifier que l&rsquo;utilisateur qui fait des requêtes sur le site utilise un navigateur et n&rsquo;est pas un bot.
+Avertissement
+Les informations et techniques présentées dans cet article sont fournies à des fins éducatives uniquement. Je décline toute responsabilité quant à l’utilisation de ces informations à des fins autres que celles de l’apprentissage et de la compréhension. Veuillez respecter toutes les lois et règlements applicables.">  
+
+  <title>
+    
+      Bypassing AWS WAF Challenge without Selenium / Capsolver
+    
+  </title>
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/" />
+  
+  
+  
+  <link rel="stylesheet" href="/css/main.ae0e4ff1c523b2a40ae2e11e7ed575aade57924f71d17b49002a29333709abf5f9471ba57824841efbe3c1298276a21f30857eb529a8246d4b0b0d05f2066b01.css" integrity="sha512-rg5P8cUjsqQK4uEeftV1qt5Xkk9x0XtJACopMzcJq/X5RxuleCSEHvvjwSmCdqIfMIV&#43;tSmoJG1LCw0F8gZrAQ==" />
+  
+</head>
+<body a="auto">
+        <main class="page-content" aria-label="Content">
+            <div class="w">
+<a href="/">..</a>
+
+
+<article>
+    <p class="post-meta">
+        <time datetime="2024-09-16 12:26:56 &#43;0200 CEST">
+            2024-09-16
+        </time>
+    </p>
+
+    <h1>Bypassing AWS WAF Challenge without Selenium / Capsolver</h1>
+
+    
+
+    <h2 id="introduction">Introduction</h2>
+<p>Dans cet article, je vais vous montrer comment contourner assez simplement le <a href="https://docs.aws.amazon.com/waf/latest/developerguide/waf-captcha-and-challenge.html">challenge AWS WAF</a>. D&rsquo;après la documentation, ce challenge s&rsquo;exécute en silence et permet de vérifier que l&rsquo;utilisateur qui fait des requêtes sur le site utilise un navigateur et n&rsquo;est pas un bot.</p>
+<h2 id="avertissement">Avertissement</h2>
+<p>Les informations et techniques présentées dans cet article sont fournies à des fins éducatives uniquement. Je décline toute responsabilité quant à l’utilisation de ces informations à des fins autres que celles de l’apprentissage et de la compréhension. Veuillez respecter toutes les lois et règlements applicables.</p>
+<h2 id="analyse-du-challenge">Analyse du challenge</h2>
+<p>Lorsque je me rends sur la page qui comporte le challenge AWS, je peux observer ces requêtes grâce à la console développeur de Chrome (F12) :</p>
+<p><img src="/images/aws_1.png" alt=""></p>
+<p>On peut voir que le site charge un script nommé <code>challenge.js</code> et ce script initie deux requêtes en particulier :</p>
+<ul>
+<li>
+<p><code>GET   https://3f38f7f4f368.a20ab67d.eu-south-2.token.awswaf.com/3f38f7f4f368/e1fcfc58118e/inputs?client=browser</code></p>
+</li>
+<li>
+<p><code>POST    https://3f38f7f4f368.a20ab67d.eu-south-2.token.awswaf.com/3f38f7f4f368/e1fcfc58118e/verify</code></p>
+</li>
+</ul>
+<p>La première sert à récupérer un challenge qui devra ensuite être résolu par la suite du script js, voici sa réponse :</p>
+<pre tabindex="0"><code>{
+    &#34;challenge&#34;: {
+        &#34;input&#34;: &#34;eyJ2ZXJzaW9uIjoxLCJ1YmlkIjoiZDIzODEwMDQtMTMyMi00NzlhLWIxYzItNDJlYTUzZDM1N2JjIiwiYXR0ZW1wdF9pZCI6IjIyMTQyOGQzLTY4ZjYtNGI3Zi04MTU4LTdkY2JlMjNhMzRlYSIsImNyZWF0ZV90aW1lIjoiMjAyNC0wOS0xNlQwODo1MTozNS4zNzI1NjUwNDNaIiwiZGlmZmljdWx0eSI6NCwiY2hhbGxlbmdlX3R5cGUiOiJIYXNoY2FzaFNjcnlwdCJ9&#34;,
+        &#34;hmac&#34;: &#34;tSTksn5TuWsPub7E4NuX0gxOFxQ+t8gLQbXrdlHWjik=&#34;,
+        &#34;region&#34;: &#34;eu-south-2&#34;
+    },
+    &#34;challenge_type&#34;: &#34;h72f957df656e80ba55f5d8ce2e8c7ccb59687dba3bfb273d54b08a261b2f3002&#34;,
+    &#34;difficulty&#34;: 4
+}
+</code></pre><p>La deuxième sert à soumettre la solution à ce challenge.
+Voici les données envoyées :</p>
+<pre tabindex="0"><code>{&#34;challenge&#34;:{&#34;input&#34;:&#34;eyJ2ZXJzaW9uIjoxLCJ1YmlkIjoiZDIzODEwMDQtMTMyMi00NzlhLWIxYzItNDJlYTUzZDM1N2JjIiwiYXR0ZW1wdF9pZCI6IjIyMTQyOGQzLTY4ZjYtNGI3Zi04MTU4LTdkY2JlMjNhMzRlYSIsImNyZWF0ZV90aW1lIjoiMjAyNC0wOS0xNlQwODo1MTozNS4zNzI1NjUwNDNaIiwiZGlmZmljdWx0eSI6NCwiY2hhbGxlbmdlX3R5cGUiOiJIYXNoY2FzaFNjcnlwdCJ9&#34;,&#34;hmac&#34;:&#34;tSTksn5TuWsPub7E4NuX0gxOFxQ+t8gLQbXrdlHWjik=&#34;,&#34;region&#34;:&#34;eu-south-2&#34;},&#34;solution&#34;:&#34;3&#34;,&#34;signals&#34;:[{&#34;name&#34;:&#34;KramerAndRio&#34;,&#34;value&#34;:{&#34;Present&#34;:&#34;vKa/rAES+iNi905d::31c32b1eb2f5065967597fddaa4f68a2::ba1fcb16edcbff37210582f0064c32131ab80c6327980bf910570f71134c5be950d0a1e946a9798382f1e40b4ce93cc04135cfbd6d28578a151786a66f343617f4240819279a788f1c8403a4b6787c7f39d415b51fd21c1473e941a2e286ecf5a29c91124dc874957bf5f690edd557a9ccd87ce4df4cb59c9664338cbfa670e2ced695b1cdb83f189ba39128b5485ac269fba9042c7f7208cd2535a5d68979243bf27a82dc97911e720492ab3858e26840d0e4eba83131cfc7137600c25607783aa31370c7eddfb79110cd2bc3f47c1b74cb4d424cb2525e2309ffeee02d01bc71c5196f5696db25a114b1c4d534957628b83fea4fe8a95d25e8ec2692a0edbe0dab37d0cd9dbba0df5176f3f34f5df0f4e4352531e1168f59078c86943b4c2f5668b32018e5646e43178f82eca076d11d3a39f313cca164e2e7abf8b1c39c5308fe1c88b88b1b9fc2810b9d27b932c8606fbde693e19d9ae96311696b4a246ed2aad62d05d7d00df79e1f03c4849bfbdd5c0857751d9c142c6b6b0717c257d2414120c5e701ceb2226395550b46f6792db8c04113a794c2af97df6daeeabccb346520f013cf800d832774cbe050db06e3de96641d37a0d2f4aec4b0988eb6fdf5108cb76240df6a77ca5bef64efe57677ee6a08a503015f81fe8c0b6ef5efa0ec62fa9737c33ce25457905e9094aace61edb86698dc76db5de6f223a6a624d5c1c788c1750e85841ecf883598eabb126e0f8ca36828b5681524be8766f98174b33eed838700ea65a4c5d00b1b3847071ffff8866b62080659219ed9f45a42f9d5fba2518dcf3d0cc28c873f569671dd7adeb500093bc522ea151e5e693f0b11e955eba58d34d5b8c0be30634167434f6b9669f88b999c4a40a30fa9bba130c512ab827c08cdbf0af0a68bccbe70b6e55763f98313601ecc36dfb56693e796632afaf0bfa44972616de7456f0bf003f01e9ef383281a8b1de6f795afc18d66f4b6bc33f2ac70efdd1dcaf097f977129fe3a90915462317821ba6e082d7fffc2760a0152bd404c0fe5ce5822d5463e4c27170e5bc786d1b4713672f6ce02dcf8625d371d29551e12f7ba63330a0c2530b9f374c274c4c45f1091aba047c4a503e797b9a611ab8d0b2621d58fadeb993d45801e83bbee73e3f94a98a7004492317e0e857ce7956e972d52f86bcd832e83d5625f75dc631bc02d4e28a5c525fef2871206fa0b21b5cf5507b2e70733d67ad11c8d0e534c9d61b97d0e252f065a17c6d1b320676065a2ee7c269daef1bbde94d3ce8edf43222fcca0a3322b844d7551be1394b16fa064040963822c27870c2183c6a57bdfb4d73ad89e5805bf5eb473084034e829256b1f0b82fdbf08667617be659209636d8b086d8347b9b3186699b021b8fc13f213828756a1c92dee333bb7bb79b10e7ff9805c3451d68c9a0029d1dc3f9ececfc6608f79150d79975674a4bd32a4bd79f9185b26581a1f2273960bf692455917fbf8cf6ec3ae4d2c6624afbc8f6394ba5e058be4f3934487166b42446e05dc91bda24ad32336f0b12909859acfa9181c75ea4a74fbd02d9d6177f2ecc4e63353333a3690f4b7198ff32f7a913ec51828dd5b8f8d824b988e0a6000ac07c6e785188a71f28303c547102496e5fc215646c7170aaacf22b8844736272a96deb958cfea28f2a713297da39e668bb74f1f926a942e5e83f71a7de199492558dd03920361211335393310e620b9cc4f6d3c512c406b80224d870f35229344fdb4df8dc6bf7612ab4b0a37db51e0428919d885cc9e351b7c2e0d6888e93ef4b81d3efbc8198deb3ccb4e021b1a0d35c1ecfc8b97c67403e7ecc9146ba067b8bc97a033f81aea71349ac267a889240ecc565fa80340c6dc679e6d4115c24538cd4293bad3cada85a1baac9ebfab363e61b0e0b88a22077680a01ed6267171528aaba449366e02c72cf7301567aa729c339e7e49f9db8cc2b6ef92f6ab33b9686850ce30a81dad803221277acce40306bac96404a0e00ff85d4b9512e756c63ea6778281e7761e6f1f084eb7b62c2b92b185e83613ed49fd32669a22abea9955b1c1a70cd7b7f1846a147f6a2934adde0188eea0b1514bc508f9ce13be56e180e5c2c5a419525afdc99febdd15dfdcce29fdd6b5536cef11b0a11f1bc7301ac58cfc13f4870817cbb4aa59d705d03fbe3aa72d35355782c8dc4786bf36822cd584b0c5db0c7f583411d75a407867d7e16766cc7730b2e938e84fc3adc8dfd57dfff246c846161ae4f445fff1aa62f97d736ca2b59ccf328b36efae871030032a6dcac4137967072509f499ac578931eb915fb3a06e3a7da9c7d658a47c20a400256cdbfda821e35e63436ac3b5d261395358bd5066e5abb1ae0c5694330bf22d20d3b7e507b6c02eed982e288f51ccacdcd677e8f5740f970825e69d6f59f56ec4de25a46bb6582f2d3e7422d122366134f58be2ac66350923f75c16765522a75f798dd22a8957fb3a45daf4c2d0d46309c6e3c00bab030cd175542a6ae34126dade01863b6313b3a7d86b1215f6d6c1c72050e2150d8f6bd4821cd0201f265965ff923037061cf7835e4704230afcfb37d63f8d1539366e4cfa3a1719cbd310b636201b8a4111afa227686efddb9de4315aa96a04e9edb06e8bcac7c07430418279bc6c52cc7b7917c72062c1951061cc5982654c0247e451d9a507bd057121896d80a64c2013e1dedcb2757cc02ae664f2ec8dfec3285b11e5bc1db1e128d724bd29499d7cb9d8202ad88ecddecf6984f54ea4c0b918cc14aee0512cee73af87c1f8f97de2edbfb51a06efaf9675cf0ed0a8e84249a8f1fc744d2946531f4a5fe34f8c246328ddb8e1149046e3f65b7d14d6366e85e5fce0e01ce9f7bc8d1cdda81db2006b02eefa2a169a72de5b73e8eb4101db93e0bb25070160a37a4609604a01f58c966e9b7cf7562551a20e6e4a0b5d1d99fddc01d862fc7070ad60328da7200343c8e5c3d38b4534bb1ab597919a838a06487a4e10c933e101c3d639a3b4fb2d145291b3fb43f611ed78068ec1856fe325399cab78c9c47217e50354eb2251882ab132c73ef3e3831902dba4681a2aeddc134c77829cc254257ec3f1d3e169d2430c5e0693f4cd43617f5c1b2617a1d823d372049441f710dc27803c236cb15b82512e6cd8ac1fe8eba318c19a17054b14c67fc08db35f31faa865e4ff27214557dcf8068188446a4a1bdfc162368467444841db8ec8bdffe20b4d887564b97b306a60e448da7d605d86318a64f241c93464a1d9c19e74d14e5bdf37a19fa0aa074702862204fb708630655e6a8922f2e2dd162b67ed574f01d2de2a539db03ff477a4719c27ff16a03a828c35f81dc2c4503453da8ad1b458953e8c9af4390881a6c9f0b6b8ca8ae82b930cda1149d0d04a88a9fadb20005ca66086cb62fb6d8f00c1dbc877784b20781f387a77462a82328d8acce6b2e5b5167d6830c5b99420cf0c7ba2b9456d4a486a55db2798bc2b29bd6a71e2066d37e559582026bc2ee9bca733dc15af61c6720449be53b733bb5eb45962f77c2beb53acd9af51cbfc121ef00f589a94d19ac1ff447a61d4da2de9d28ce0a87c9c1534ad863398bfc426ffb95cb7a26010b5c3cc0c493d2e14f5434680d168deb64203984874ea5372c3476f7c297dc05d01cf93174fb404a07ef8fd051bc48979a8d434d90901a72b196c525f8feadaa12da4253ca74f7144479f4919b1e89fad123b9ed8b8521a45decea75642aedc2939c8ae13582d59a70ae999250e68dad9deaf4a741c49a9192e4c7a2bb30d17f10e7d31514fb9697f0c563d42c6fe5fcf7be2fa76eca1ad36d3ac8b4d74c5487ecfade63ed5ed9c6fb6f6a3d4eb2195a1bb4df8840db55fa6c54421d68eea707bd3f5aaa6212fda33081f78db163e9fee9ab2f0831c643e13721ff09bfecd19c1f40d998dbdd52fcb723223aae571cd3397e5d6edb6a0e6c53eb6f66139f14409a9bb73ea18a8990d42ed1d1e590177e0020efa8244eac8f4d662d124050ee996cdfd8ac431624d7d9a8f8e847f34a574e580a24467245b1fd498f0a20afc8173ff75576a8daaa97185147dd0c38219a1eeef43243231beb542de4a1444ab942f86a21ef1181f51996f57cb1949e506c1ffab4443a12a297c655044c8874abe744678fbb570be01e59454d1c7b178b639a661ebeba51ee54ede71a6205c4cb735ac567233d3554c5aa35f181f33cae1aa90ffdf379604c29922ab12d9f0da05b49093033241f490d9ea42318b24cf02b85be7ab236c6ebf0303ce61e4753c648ef531682c5c0966ec743ceb06ded53b26c41513e7c9483444c856ac64232611fa9d536929b247a1a938795f1d072758cbe1953dd8fa1467215754c452d84c8e5b9d72c083f77716e793436aeb3140110f9906504a4c6132187162e726bf29f8749ad79e467adda9c9227f267f91a5821af1a0b0f9fc183b7a4f05309e87c04afa30e2149f6f69d34086a66174a4fd4005cd4920f900ea13c95aad49642645fcaa1b0b2bc8e6b3eb13063925c853adb3a3899899a174aefa50d1c42629a0892d2bf7b81d4b4628f26860d998cca17a0c86a4cc2a753644c44174c9f740dcd14f5f91ffcdf8e67b2501e0a54ef82823fc3988bf7c05b33525ba2ab56b233b2124e471613d1987eab30989c2c1b43868d2c68668e8cc12589c2f9ecf51a0b77a9d74b616cc776246af38380c2ffa29493a80e975dcbac6bb3df8c51d760ff09387fa5a025b2624a16c726714351626a7cb6f66e8e408e8bf038a5e44ebb5886f9609f1b6fe3783a854cd1854a0e930d5a1fda01e5956a84f0bd570f4204ca3a20844e9d21167d5286401988671b0103514348943f7d696d0956e51ba9607531429506298e8635159f1eef342656902702a7c54dbd018b697b97e6f261b327368d7bcedd91f5942fda78bd9cae00edea2b758a555083739e7e883bbf2c197b0e0bde7d921c3801a93182b46bfb0bed6ffccfd6c49b5f93c900e858067c77caa3111618ef53108e5ebec48109b7ffe64a117c01e7a0ca10ed5a6b4714ddc0b5e1d7c14a56a0e41d781dfd65ec0902fcb504a312f7a09e164d7bab0f3cdc0136485bf2ad86b195297c6bc822315b13930456d44a63b76117ecfbac076d1f9a971544d96d30c02cb0539d1882efdf7d9f89b35a0078dba00ee758c05bf1cb706337ac033edc9e483ead6f217790a94e3a23c0eafa3e5a1cf1c93691cb2ac2971dcda73abd6efa049eeedbbd2313ec3eacf7ad2fe5f9ec3681b65cb447dd3a4cb11308e98ab80c7a53b9204be905bcc319fe61a3d8cff3472eb2ac147e5ed78f1d2314d5b88e666b3df5b63071a9302b7da4baba72c72f5193465898cbc30a470e2e0a68989d0c17a84bf7b0d30cb47837d5a91fbaf097e79a3e2bcf8bb8c31f64d2abf59af398c15c194c6a7a60fe779065b61e0457df3dc52c46cdbe53b0a691156a9e4b83586b10e98b2e5bb3c8b11fd7679f137d3c8d16220ba730b1d7d0f03aedda49d6a276a5ac36495f5bb089bd56452c2b717f624ce9c6a250a1335ed592a6e9e01e&#34;}}],&#34;checksum&#34;:&#34;709B4F2A&#34;,&#34;existing_token&#34;:&#34;a23a684e-fd2c-488c-bdab-92acf2b3e90a:HQoAmpafTGA2AAAA:EjcVnD+NDuL/Nx58/UPHDBJUf0xPqHzzAnDDeYorwMPNAwuKt7cJiuJ9NyYc5IJi5ytwnnZrsWvCrDFO/qR1jtdPbTmclPcRq6+Dk1/qjPxPYrC2KSd60b1r3skZ+9i8E1xcMOGK0Zx1OUzBavaW+SFN7B/wJ9zdLoZpm5QpOhxhAm/xlyp2jFpCv9/jLCQAXjplg8ttOgXqoqnYSkhlWm4pm1h2ZahqMq9pNmUBuM8F0TgjOgCqZw==&#34;,&#34;client&#34;:&#34;Browser&#34;,&#34;domain&#34;:&#34;auth.ankama.com&#34;,&#34;metrics&#34;:[{&#34;name&#34;:&#34;2&#34;,&#34;value&#34;:0.699999988079071,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;100&#34;,&#34;value&#34;:2,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;101&#34;,&#34;value&#34;:1,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;102&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;103&#34;,&#34;value&#34;:14,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;104&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;105&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;106&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;107&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;108&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;undefined&#34;,&#34;value&#34;:1,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;110&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;111&#34;,&#34;value&#34;:17,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;112&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;undefined&#34;,&#34;value&#34;:1,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;3&#34;,&#34;value&#34;:4.900000035762787,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;7&#34;,&#34;value&#34;:1,&#34;unit&#34;:&#34;4&#34;},{&#34;name&#34;:&#34;1&#34;,&#34;value&#34;:49,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;4&#34;,&#34;value&#34;:17.799999952316284,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;5&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;6&#34;,&#34;value&#34;:66.79999995231628,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;0&#34;,&#34;value&#34;:117.19999998807907,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;8&#34;,&#34;value&#34;:1,&#34;unit&#34;:&#34;4&#34;}]}
+</code></pre><p>On peut voir beaucoup de métadonnées et analyser le script pour savoir à quoi corresponde chaque métadonnée est assez complexe étant donné que le script est obfusqué.</p>
+<p>Voici ce que cette requête nous renvoie :</p>
+<pre tabindex="0"><code>{
+    &#34;token&#34;: &#34;a23a684e-fd2c-488c-bdab-92acf2b3e90a:HQoAack99c8tAAAA:WRKn2fi7JKntl6bYFwYlnmebxT0Qt8dczToAirxQqblMQ0Qnp7BwfijEnt0ZoQZaLVCUZ+nIiizJK3UvVURT2X4N912hwbvlbuo3kWdKKOb+ostjYUYn9vMLZczcIBhh2pyYxgcbPsTLc2OOAm8EeT/25xNYjYa8NF8qr4Ifm1a6/xHA03F3uEERb7nimb2HboTGzncXeTfWyrnN2rPsxWX+LKY2YHaDrq9QcLzWlXLUhFPbuM+B8w==&#34;,
+    &#34;inputs&#34;: null
+}
+</code></pre><p>On peut voir que cette requête nous renvoie un token qui est en réalité utilisé en valeur du cookie <code>aws-waf-token</code> et qui sera obligatoire pour toutes les prochaines requêtes pour ne pas se faire bloquer par le WAF.</p>
+<p><img src="/images/aws_2.png" alt=""></p>
+<h2 id="contournement-sans-navigateur">Contournement sans navigateur</h2>
+<p>La méthode pour contourner ce mécanisme va être de récupérer le script <code>challenge.js</code> et réussir à le lancer avec <a href="https://nodejs.org/fr">Node JS</a> depuis notre ordinateur afin de ne pas avoir à passer par un navigateur.</p>
+<p>Je vais donc commencer par télécharger le script et utiliser <a href="https://lelinhtinh.github.io/de4js/">de4js</a> pour le rendre un peu plus lisible.</p>
+<p>Voici à quoi ressemble le début du script :</p>
+<p><img src="/images/aws_3.png" alt=""></p>
+<p>On peut déjà voir que la variable <code>a0_0x2a29</code> sert à définir une liste de strings qui seront récupérés dynamiquement à l&rsquo;aide de la fonction <code>a0_0x2a28</code>, ce qui rend la lecture du script encore plus difficile.</p>
+<p>Essayons de lancer le script :</p>
+<pre tabindex="0"><code>&gt; node challenge.js
+
+_0x4efe38 = document[_0x280572(0x161)];
+               ^
+ReferenceError: document is not defined
+    at C:\Users\&lt;USER&gt;\Desktop\AWS\challenge.js:13115:29
+    at C:\Users\&lt;USER&gt;\Desktop\AWS\challenge.js:13120:10
+    at C:\Users\&lt;USER&gt;\Desktop\AWS\challenge.js:15229:7
+    at Object.&lt;anonymous&gt; (C:\Users\&lt;USER&gt;\Desktop\AWS\challenge.js:15230:3)
+    at Module._compile (node:internal/modules/cjs/loader:1369:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1427:10)
+    at Module.load (node:internal/modules/cjs/loader:1206:32)
+    at Module._load (node:internal/modules/cjs/loader:1022:12)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:135:12)
+    at node:internal/main/run_main_module:28:49
+</code></pre><p>Nous ne nous trouvons pas dans un environnement de navigateur web, et les variables comme <code>document</code> ou <code>window</code> ne sont donc pas définies. Dans le cadre d&rsquo;un navigateur, ces variables sont définies pour permettre aux sites internet d&rsquo;avoir des informations sur le <a href="https://developer.mozilla.org/fr/docs/Glossary/DOM">DOM</a> ou sur la <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/window">fenêtre</a> actuelle.</p>
+<p>Nous pouvons donc utiliser le module npm <a href="https://github.com/jsdom/jsdom">jsdom</a> pour simuler un environnement de navigateur.</p>
+<p>J&rsquo;ajoute ceci au début du script :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-js" data-lang="js"><span style="display:flex;"><span><span style="color:#66d9ef">const</span> { <span style="color:#a6e22e">JSDOM</span> } <span style="color:#f92672">=</span>  <span style="color:#a6e22e">require</span>(<span style="color:#e6db74">&#39;jsdom&#39;</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span>  <span style="color:#a6e22e">dom</span>  <span style="color:#f92672">=</span>  <span style="color:#66d9ef">new</span>  <span style="color:#a6e22e">JSDOM</span>(<span style="color:#e6db74">`
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&lt;!DOCTYPE html&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&lt;html lang=&#34;fr&#34;&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&lt;head&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">// SUITE DU CODE SOURCE DE LA PAGE QUI
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">// CONTIENT LE CHALLENGE
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">`</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span>  document  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">dom</span>.window.document;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span>  window  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">dom</span>.window;
+</span></span></code></pre></div><p>Nos deux variables sont définies et on peut essayer de relancer le script :</p>
+<pre tabindex="0"><code>&gt; node challenge.js
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\&lt;USER&gt;\Desktop\AWS\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+</code></pre><p>On peut voir que la fonction <code>HTMLCanvasElement.prototype.getContext</code> n&rsquo;est pas implémentée, et donc nous allons devoir l&rsquo;implémenter nous même grâce à sa <a href="https://developer.mozilla.org/fr/docs/Web/API/HTMLCanvasElement/getContext">documentation</a>.</p>
+<p>On modifie notre script comme ceci en utilisant le module npm canvas :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-js" data-lang="js"><span style="display:flex;"><span><span style="color:#66d9ef">const</span> { <span style="color:#a6e22e">JSDOM</span> } <span style="color:#f92672">=</span>  <span style="color:#a6e22e">require</span>(<span style="color:#e6db74">&#39;jsdom&#39;</span>);
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span> { <span style="color:#a6e22e">createCanvas</span> } <span style="color:#f92672">=</span>  <span style="color:#a6e22e">require</span>(<span style="color:#e6db74">&#39;canvas&#39;</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span>  <span style="color:#a6e22e">dom</span>  <span style="color:#f92672">=</span>  <span style="color:#66d9ef">new</span>  <span style="color:#a6e22e">JSDOM</span>(<span style="color:#e6db74">`
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&lt;!DOCTYPE html&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&lt;html lang=&#34;fr&#34;&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&lt;head&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">// SUITE DU CODE SOURCE DE LA PAGE QUI
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">// CONTIENT LE CHALLENGE
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">`</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// IMPLEMENTATION DE LA METHODE MANQUANTE
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#a6e22e">dom</span>.window.<span style="color:#a6e22e">HTMLCanvasElement</span>.<span style="color:#a6e22e">prototype</span>.<span style="color:#a6e22e">getContext</span>  <span style="color:#f92672">=</span>  <span style="color:#66d9ef">function</span>(<span style="color:#a6e22e">type</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">const</span>  <span style="color:#a6e22e">canvas</span>  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">createCanvas</span>();
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">return</span>  <span style="color:#a6e22e">canvas</span>.<span style="color:#a6e22e">getContext</span>(<span style="color:#a6e22e">type</span>);
+</span></span><span style="display:flex;"><span>};
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span>  document  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">dom</span>.window.document;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span>  window  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">dom</span>.window;
+</span></span></code></pre></div><p>On peut relancer le script :</p>
+<pre tabindex="0"><code>&gt; node challenge.js
+
+(process:10596): Pango-WARNING **: 11:33:33.642: couldn&#39;t load font &#34;dfgstg Not-Rotated 13.3330078125px&#34;, falling back to &#34;Sans Not-Rotated 13.3330078125px&#34;, expect ugly output.
+C:\Users\&lt;USER&gt;\Desktop\AWS\challenge.js:2687
+
+&#39;histogramBins&#39;: this[_0x2e39c2[0x35]](_0x11980d[_0x2e39c2[0x33]](_0x2e39c2[0x8], _0x2e39c2[0x8], _0xda83a[_0x2e39c2[0x22]], _0xda83a[_0x2e39c2[0x26]])[_0x2e39c2[0x42]])
+
+TypeError: Canvas width is 0
+</code></pre><p>Nous avons un warning concernant une police d&rsquo;écriture non trouvée, nous règlerons ça plus tard, et une erreur qui nous dit que la largeur de notre canva est de 0.</p>
+<p>On modifie notre code pour ajouter des dimensions au canva :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-js" data-lang="js"><span style="display:flex;"><span><span style="color:#66d9ef">const</span> { <span style="color:#a6e22e">JSDOM</span> } <span style="color:#f92672">=</span>  <span style="color:#a6e22e">require</span>(<span style="color:#e6db74">&#39;jsdom&#39;</span>);
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span> { <span style="color:#a6e22e">createCanvas</span> } <span style="color:#f92672">=</span>  <span style="color:#a6e22e">require</span>(<span style="color:#e6db74">&#39;canvas&#39;</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span>  <span style="color:#a6e22e">dom</span>  <span style="color:#f92672">=</span>  <span style="color:#66d9ef">new</span>  <span style="color:#a6e22e">JSDOM</span>(<span style="color:#e6db74">`
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&lt;!DOCTYPE html&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&lt;html lang=&#34;fr&#34;&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&lt;head&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">// SUITE DU CODE SOURCE DE LA PAGE QUI
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">// CONTIENT LE CHALLENGE
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">`</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// IMPLEMENTATION DE LA METHODE MANQUANTE
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#a6e22e">dom</span>.window.<span style="color:#a6e22e">HTMLCanvasElement</span>.<span style="color:#a6e22e">prototype</span>.<span style="color:#a6e22e">getContext</span>  <span style="color:#f92672">=</span>  <span style="color:#66d9ef">function</span>(<span style="color:#a6e22e">type</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// AJOUT DES DIMENSIONS AU CANVA
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#66d9ef">const</span>  <span style="color:#a6e22e">canvas</span>  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">createCanvas</span>(<span style="color:#ae81ff">800</span>, <span style="color:#ae81ff">600</span>);
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">return</span>  <span style="color:#a6e22e">canvas</span>.<span style="color:#a6e22e">getContext</span>(<span style="color:#a6e22e">type</span>);
+</span></span><span style="display:flex;"><span>};
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span>  document  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">dom</span>.window.document;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span>  window  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">dom</span>.window;
+</span></span></code></pre></div><p>Quand on relance le script, il ne fait plus rien mais il ne s&rsquo;arrête pas.
+Après de longues analyses de ce script js obfusqué, je trouve la méthode qui permet d&rsquo;envoyer la requête de vérification de la solution du challenge :</p>
+<p><img src="/images/aws_4.png" alt=""></p>
+<p>La fonction passe dans le case <code>0x0</code> qui peut être réécrit de façon plus lisible comme ceci :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-js" data-lang="js"><span style="display:flex;"><span><span style="color:#66d9ef">case</span>  <span style="color:#ae81ff">0x0</span><span style="color:#f92672">:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// Préparation des variables
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#a6e22e">_0x5f1736</span>  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0x56f025</span>(<span style="color:#a6e22e">_0x213c50</span>);
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">_0x1d14cf</span>  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0x1de77f</span>[<span style="color:#a6e22e">_0x42786e</span>];
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">_0x6fa820</span>[<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1df</span>)] <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0x443b51</span>();
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// Création du body
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">_0x3ab45e</span>(<span style="color:#ae81ff">0x9e2</span>) <span style="color:#f92672">==</span>  <span style="color:#a6e22e">_0x1d14cf</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">_0xfebf69</span>  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">JSON</span>[<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1da</span>)](<span style="color:#a6e22e">_0x6fa820</span>); <span style="color:#75715e">// Si c&#39;est JSON
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>} <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// FormData avec JSON
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#a6e22e">_0xfebf69</span>  <span style="color:#f92672">=</span>  <span style="color:#66d9ef">new</span>  <span style="color:#a6e22e">FormData</span>();
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">_0xfebf69</span>[<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1d6</span>)](<span style="color:#a6e22e">_0x3ab45e</span>(<span style="color:#ae81ff">0x781</span>), <span style="color:#a6e22e">_0x6fa820</span>[<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1f3</span>)]);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">_0x6fa820</span>[<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1f3</span>)] <span style="color:#f92672">=</span>  <span style="color:#66d9ef">null</span>;
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">_0xfebf69</span>[<span style="color:#e6db74">&#39;append&#39;</span>](<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1af</span>), <span style="color:#a6e22e">JSON</span>[<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1da</span>)](<span style="color:#a6e22e">_0x6fa820</span>));
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// Envoi de la requête fetch
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">return</span> [<span style="color:#ae81ff">0x4</span>, <span style="color:#a6e22e">fetch</span>(<span style="color:#e6db74">&#34;https://3f38f7f4f368.a20ab67d.eu-south-2.token.awswaf.com/3f38f7f4f368/e1fcfc58118e/verify&#34;</span>, {
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#39;body&#39;</span><span style="color:#f92672">:</span>  <span style="color:#a6e22e">_0xfebf69</span>,
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#39;method&#39;</span><span style="color:#f92672">:</span>  <span style="color:#a6e22e">_0x3ab45e</span>(<span style="color:#ae81ff">0x437</span>)
+</span></span><span style="display:flex;"><span>})
+</span></span><span style="display:flex;"><span>.<span style="color:#a6e22e">then</span>(<span style="color:#66d9ef">function</span> (<span style="color:#a6e22e">_0x572df3</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span><span style="color:#a6e22e">_0x572df3</span>[<span style="color:#e6db74">&#39;ok&#39;</span>]) {
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">throw</span>  <span style="color:#66d9ef">new</span>  Error(<span style="color:#e6db74">&#34;Response not OK. Status: &#34;</span>  <span style="color:#f92672">+</span>  <span style="color:#a6e22e">_0x572df3</span>.<span style="color:#a6e22e">status</span>);
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">var</span>  <span style="color:#a6e22e">decoded_body</span>  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0x572df3</span>.<span style="color:#a6e22e">json</span>()
+</span></span><span style="display:flex;"><span>	.<span style="color:#a6e22e">then</span>(<span style="color:#66d9ef">function</span> (<span style="color:#a6e22e">body</span>) {
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">return</span>  <span style="color:#a6e22e">body</span>;
+</span></span><span style="display:flex;"><span>	})
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">return</span>  <span style="color:#a6e22e">decoded_body</span>;
+</span></span><span style="display:flex;"><span>})
+</span></span><span style="display:flex;"><span>.<span style="color:#66d9ef">catch</span>(<span style="color:#66d9ef">function</span> (<span style="color:#a6e22e">error</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// Gérez les erreurs de fetch ou de traitement de la réponse ici
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#a6e22e">console</span>.<span style="color:#a6e22e">error</span>(<span style="color:#e6db74">&#39;Error occurred:&#39;</span>, <span style="color:#a6e22e">error</span>);
+</span></span><span style="display:flex;"><span>})];
+</span></span></code></pre></div><p>On lance à nouveau le script et voici ce qu&rsquo;il se passe :</p>
+<pre tabindex="0"><code>&gt; node challenge.js
+
+(process:4220): Pango-WARNING **: 11:47:40.611: couldn&#39;t load font &#34;dfgstg Not-Rotated 13.3330078125px&#34;, falling back to &#34;Sans Not-Rotated 13.3330078125px&#34;, expect ugly output.
+Error occurred: Error: Response not OK. Status: 400
+    at C:\Users\&lt;USER&gt;\Desktop\AWS\challenge.js:15147:67
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+</code></pre><p>La réponse n&rsquo;est pas un code 200 mais on peut quand même essayer d&rsquo;afficher les données envoyées et les données reçues pour comprendre pourquoi :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-js" data-lang="js"><span style="display:flex;"><span><span style="color:#66d9ef">case</span>  <span style="color:#ae81ff">0x0</span><span style="color:#f92672">:</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// Préparation des variables
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#a6e22e">_0x5f1736</span>  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0x56f025</span>(<span style="color:#a6e22e">_0x213c50</span>);
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">_0x1d14cf</span>  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0x1de77f</span>[<span style="color:#a6e22e">_0x42786e</span>];
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">_0x6fa820</span>[<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1df</span>)] <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0x443b51</span>();
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// Création du body
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">_0x3ab45e</span>(<span style="color:#ae81ff">0x9e2</span>) <span style="color:#f92672">==</span>  <span style="color:#a6e22e">_0x1d14cf</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">_0xfebf69</span>  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">JSON</span>[<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1da</span>)](<span style="color:#a6e22e">_0x6fa820</span>); <span style="color:#75715e">// Si c&#39;est JSON
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>} <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// FormData avec JSON
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#a6e22e">_0xfebf69</span>  <span style="color:#f92672">=</span>  <span style="color:#66d9ef">new</span>  <span style="color:#a6e22e">FormData</span>();
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">_0xfebf69</span>[<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1d6</span>)](<span style="color:#a6e22e">_0x3ab45e</span>(<span style="color:#ae81ff">0x781</span>), <span style="color:#a6e22e">_0x6fa820</span>[<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1f3</span>)]);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">_0x6fa820</span>[<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1f3</span>)] <span style="color:#f92672">=</span>  <span style="color:#66d9ef">null</span>;
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">_0xfebf69</span>[<span style="color:#e6db74">&#39;append&#39;</span>](<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1af</span>), <span style="color:#a6e22e">JSON</span>[<span style="color:#a6e22e">_0x2db335</span>(<span style="color:#ae81ff">0x1da</span>)](<span style="color:#a6e22e">_0x6fa820</span>));
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// Affichage du body (données envoyées) :
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#a6e22e">console</span>.<span style="color:#a6e22e">log</span>(<span style="color:#a6e22e">_0xfebf69</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// Envoi de la requête fetch
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">return</span> [<span style="color:#ae81ff">0x4</span>, <span style="color:#a6e22e">fetch</span>(<span style="color:#e6db74">&#34;https://3f38f7f4f368.a20ab67d.eu-south-2.token.awswaf.com/3f38f7f4f368/e1fcfc58118e/verify&#34;</span>, {
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#39;body&#39;</span><span style="color:#f92672">:</span>  <span style="color:#a6e22e">_0xfebf69</span>,
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#39;method&#39;</span><span style="color:#f92672">:</span>  <span style="color:#a6e22e">_0x3ab45e</span>(<span style="color:#ae81ff">0x437</span>)
+</span></span><span style="display:flex;"><span>})
+</span></span><span style="display:flex;"><span>.<span style="color:#a6e22e">then</span>(<span style="color:#66d9ef">function</span> (<span style="color:#a6e22e">_0x572df3</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span><span style="color:#a6e22e">_0x572df3</span>[<span style="color:#e6db74">&#39;ok&#39;</span>]) {
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// Affichage de la réponse du serveur
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		<span style="color:#a6e22e">_0x572df3</span>.<span style="color:#a6e22e">text</span>().<span style="color:#a6e22e">then</span>(<span style="color:#66d9ef">function</span> (<span style="color:#a6e22e">body</span>) {
+</span></span><span style="display:flex;"><span>			<span style="color:#a6e22e">console</span>.<span style="color:#a6e22e">log</span>(<span style="color:#a6e22e">body</span>);
+</span></span><span style="display:flex;"><span>			<span style="color:#66d9ef">return</span>  <span style="color:#a6e22e">body</span>;
+</span></span><span style="display:flex;"><span>		});
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">throw</span>  <span style="color:#66d9ef">new</span>  Error(<span style="color:#e6db74">&#34;Response not OK. Status: &#34;</span>  <span style="color:#f92672">+</span>  <span style="color:#a6e22e">_0x572df3</span>.<span style="color:#a6e22e">status</span>);
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">var</span>  <span style="color:#a6e22e">decoded_body</span>  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0x572df3</span>.<span style="color:#a6e22e">json</span>()
+</span></span><span style="display:flex;"><span>	.<span style="color:#a6e22e">then</span>(<span style="color:#66d9ef">function</span> (<span style="color:#a6e22e">body</span>) {
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">return</span>  <span style="color:#a6e22e">body</span>;
+</span></span><span style="display:flex;"><span>	})
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">return</span>  <span style="color:#a6e22e">decoded_body</span>;
+</span></span><span style="display:flex;"><span>})
+</span></span><span style="display:flex;"><span>.<span style="color:#66d9ef">catch</span>(<span style="color:#66d9ef">function</span> (<span style="color:#a6e22e">error</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// Gérez les erreurs de fetch ou de traitement de la réponse ici
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#a6e22e">console</span>.<span style="color:#a6e22e">error</span>(<span style="color:#e6db74">&#39;Error occurred:&#39;</span>, <span style="color:#a6e22e">error</span>);
+</span></span><span style="display:flex;"><span>})];
+</span></span></code></pre></div><p>Voici ce que l&rsquo;on obtient après avoir relancé le script :</p>
+<p><img src="/images/aws_5.png" alt=""></p>
+<p>On comprend directement d&rsquo;ou provient l&rsquo;erreur, en effet, étant donné que nous ne sommes pas dans un environnement de navigateur web, le script js n&rsquo;a pas réussi à obtenir le domaine sur lequel nous sommes censés être.
+Heureusement nous connaissons ce domaine et nous pouvons donc le remplacer dans le body avant d&rsquo;envoyer la requête :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-js" data-lang="js"><span style="display:flex;"><span><span style="color:#a6e22e">_0xfebf69</span>  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0xfebf69</span>.<span style="color:#a6e22e">replace</span>(<span style="color:#e6db74">&#39;&#34;domain&#34;:&#34;&#34;&#39;</span>, <span style="color:#e6db74">&#39;&#34;domain&#34;:&#34;auth.ankama.com&#34;&#39;</span>)
+</span></span></code></pre></div><p>Et on peut ajouter une ligne pour afficher le body lorsqu&rsquo;il n&rsquo;y a pas d&rsquo;erreur :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-js" data-lang="js"><span style="display:flex;"><span><span style="color:#66d9ef">var</span>  <span style="color:#a6e22e">decoded_body</span>  <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0x572df3</span>.<span style="color:#a6e22e">json</span>()
+</span></span><span style="display:flex;"><span>.<span style="color:#a6e22e">then</span>(<span style="color:#66d9ef">function</span> (<span style="color:#a6e22e">body</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">console</span>.<span style="color:#a6e22e">log</span>(<span style="color:#a6e22e">body</span>); <span style="color:#75715e">// ICI
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#66d9ef">return</span>  <span style="color:#a6e22e">body</span>;
+</span></span><span style="display:flex;"><span>})
+</span></span></code></pre></div><p>On relance le script :</p>
+<pre tabindex="0"><code>&gt; node challenge.js
+
+(process:13584): Pango-WARNING **: 12:01:59.768: couldn&#39;t load font &#34;dfgstg Not-Rotated 13.3330078125px&#34;, falling back to &#34;Sans Not-Rotated 13.3330078125px&#34;, expect ugly output.
+{
+  token: &#39;a23a684e-fd2c-488c-bdab-92acf2b3e90a:HQoAZEZGhDcAAAAA:hSaOGj8XmdCvkKDcIx40q4UxrFqUBfk1EIuy38aAxga5cU6i4Ss6pFm/a+fOCvg73+3LPnj9NH/Bv4UQ5P9FJTA/GUOYmkq0HBRPm9xuC+eWIzi3WwS8ya/qq02c4StQAsrHeKVRuNcF7bTjFLRAyIQ4xAxVnwmpFJLFsxeUIv+VWimnrYubxJkT9WM13ZWuI2Z9ZdoYew3nkWQwSxQDe2HNFP+HQlxZXPYabVxAHyfdRRHXug==&#39;,
+  inputs: {
+    challenge: {
+      input: &#39;eyJ2ZXJzaW9uIjoxLCJ1YmlkIjoiNWFhMGVmZDEtNWQ3MS00ZTBlLThlZGUtZWFlZDExNDVjNGFkIiwiYXR0ZW1wdF9pZCI6IjFmZTQyMDE0LTI3YTItNGMyOC05NDMwLWEzYjhjMDFhMmNiMiIsImNyZWF0ZV90aW1lIjoiMjAyNC0wOS0xNlQxMDowMjowMC4zNTMxMDkyMDVaIiwiZGlmZmljdWx0eSI6NCwiY2hhbGxlbmdlX3R5cGUiOiJIYXNoY2FzaFNjcnlwdCJ9&#39;,
+      hmac: &#39;KVHPIAvmip3pUrvhotGJAs7ojY0HtzhA7OmoDNjIY/E=&#39;,
+      region: &#39;eu-south-2&#39;
+    },
+    challenge_type: &#39;h72f957df656e80ba55f5d8ce2e8c7ccb59687dba3bfb273d54b08a261b2f3002&#39;,
+    difficulty: 4
+  }
+}
+
+{
+  token: &#39;a23a684e-fd2c-488c-bdab-92acf2b3e90a:HQoAlk9Ggk0AAAAA:kUM/zp0/mh4oxWt4VwrWpDItzB40Tk0aArLqXN7eF7Dd2M4oFFaxbx1OnCUDx4iCxvjRyrXx6fjPeYcS2yhqlM9EO/0wNnCW5yFhyBj4xilCQZzDE1VntABW55FeanhyioO94TvQbHlFkZMCqb8C27ufkuVnpt9RAYD8kdbBKhN2TDctEnesnupG0pb3Y+sw5u2um1k55zrCAa05bfjXFQusdZlExW4dByNoeJPXfYAzP64Nog==&#39;,
+  inputs: null
+}
+</code></pre><p>On peut alors voir que les deux requêtes ont été effectuées et que le script nous a bien retourné un token valide.</p>
+<p>Avec un peu de logique, on peut penser que ce token sera ajouté en tant que cookie plus tard dans le script js et par chance, tout à la fin du script j&rsquo;ai trouvé ces deux lignes :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-js" data-lang="js"><span style="display:flex;"><span>window[<span style="color:#a6e22e">_0x45efe9</span>(<span style="color:#ae81ff">0x118</span>)] <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0x432fa0</span>;
+</span></span><span style="display:flex;"><span>window[<span style="color:#e6db74">&#39;ChallengeScript&#39;</span>] <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0x390700</span>;
+</span></span></code></pre></div><p>Qu&rsquo;on peut modifier comme ceci :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-js" data-lang="js"><span style="display:flex;"><span><span style="color:#a6e22e">console</span>.<span style="color:#a6e22e">log</span>(<span style="color:#a6e22e">_0x45efe9</span>(<span style="color:#ae81ff">0x118</span>));
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">console</span>.<span style="color:#a6e22e">log</span>(<span style="color:#a6e22e">_0x432fa0</span>);
+</span></span><span style="display:flex;"><span>window[<span style="color:#a6e22e">_0x45efe9</span>(<span style="color:#ae81ff">0x118</span>)] <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0x432fa0</span>;
+</span></span><span style="display:flex;"><span>window[<span style="color:#e6db74">&#39;ChallengeScript&#39;</span>] <span style="color:#f92672">=</span>  <span style="color:#a6e22e">_0x390700</span>;
+</span></span></code></pre></div><p>Ce qui nous donne :</p>
+<pre tabindex="0"><code>&gt; node challenge.js
+
+AwsWafIntegration
+
+{
+  fetch: [Function: fetch],
+  getToken: [Function: getToken],
+  forceRefreshToken: [Function: forceRefreshToken],
+  hasToken: [Function: hasToken],
+  checkForceRefresh: [Function: checkForceRefresh],
+  saveReferrer: [Function: saveReferrer]
+}
+</code></pre><p>Ces lignes servent en fait à donner à la page des fonctions utiles pour le challenge AWS, on peut le vérifier comme ceci :</p>
+<p><img src="/images/aws_6.png" alt=""></p>
+<p>Et donc on peut modifier le script js pour appeler la fonction <code>getToken</code> comme ceci :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-js" data-lang="js"><span style="display:flex;"><span><span style="color:#75715e">//window[_0x45efe9(0x118)] = _0x432fa0;
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">//window[&#39;ChallengeScript&#39;] = _0x390700;
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#a6e22e">_0x432fa0</span>.<span style="color:#a6e22e">getToken</span>().<span style="color:#a6e22e">then</span>(<span style="color:#a6e22e">response</span>  =&gt; {
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">console</span>.<span style="color:#a6e22e">log</span>(<span style="color:#a6e22e">response</span>); <span style="color:#75715e">// AFFICHER LE TOKEN
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#a6e22e">process</span>.<span style="color:#a6e22e">exit</span>(<span style="color:#ae81ff">0</span>); <span style="color:#75715e">// QUITTER LE PROGRAMME ENSUITE
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>});
+</span></span></code></pre></div><p>Et lorsqu&rsquo;on relance le script :</p>
+<pre tabindex="0"><code>&gt; node challenge.js
+
+(process:6652): Pango-WARNING **: 12:14:36.980: couldn&#39;t load font &#34;dfgstg Not-Rotated 13.3330078125px&#34;, falling back to &#34;Sans Not-Rotated 13.3330078125px&#34;, expect ugly output.
+
+a23a684e-fd2c-488c-bdab-92acf2b3e90a:HQoAoiRGkkMHAAAA:ZK945Ra2APa0Wb4u54gsh2AOZ/2ChSgpK2+FQrD/0TxZQ9yBuFMv3JcVNgaOPcriMZi6kYCp+Rj2BvKeJXBmsshXO5gXVOil5xFi1X5aXQYezU/qBqaUgGyQfRzdJRBgU/W7/uqPEd6aleX+W9qqudVUfFgEEi5IQmJngIxtDLPZUonMH+gQD20GqStaU2bAIdPDtqoYNOMutuVnzI0JcYs+Qq0AtzN5LlroNupO4gmD4HC08Q==
+</code></pre><p>Le token a bien été reçu, et peut être utilisé pour faire une requête à la prochaine page protégé par le challenge AWS WAF !</p>
+<p>Pour l&rsquo;histoire de la police d&rsquo;écriture, on peut rechercher dans le script js le nom de la police : <code>dfgstg</code> et le remplacer par <code>Arial</code> qui est une police d&rsquo;écriture par défaut.</p>
+<p><img src="/images/aws_7.png" alt=""></p>
+<p><img src="/images/aws_8.png" alt=""></p>
+<h2 id="conclusion">Conclusion</h2>
+<p>Si vous avez pour but de bloquer les différents bots de votre site internet, il est préférable de se pencher vers l&rsquo;utilisation du captcha du WAF AWS, qui n&rsquo;est pas possible de bypass avec cette méthode.</p>
+
+</article>
+
+            </div>
+        </main>
+    </body></html>
