@@ -2,10 +2,13 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://l0tus77.github.io/posts/awswaf/</loc>
-    <lastmod>2024-09-16T12:26:56+02:00</lastmod>
-  </url><url>
     <loc>https://l0tus77.github.io/posts/</loc>
+    <lastmod>2024-09-17T12:26:56+02:00</lastmod>
+  </url><url>
+    <loc>https://l0tus77.github.io/posts/awsreverse/</loc>
+    <lastmod>2024-09-17T12:26:56+02:00</lastmod>
+  </url><url>
+    <loc>https://l0tus77.github.io/posts/awswaf/</loc>
     <lastmod>2024-09-16T12:26:56+02:00</lastmod>
   </url><url>
     <loc>https://l0tus77.github.io/posts/pyarmor/</loc>

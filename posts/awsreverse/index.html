@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en-us"><head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+   <meta name="description" content="Introduction
+Dans cet article, je vais me plonger en profondeur sur le challenge AWS WAF pour comprendre comment il fonctionne afin de trouver un moyen de le contourner efficacement, sans passer par du Node JS.
+Si vous n&rsquo;avez pas lu mon premier article sur ce sujet, je vous conseille d&rsquo;aller le lire pour mieux comprendre celui-ci.
+Article partie 1
+Avertissement
+Les informations et techniques présentées dans cet article sont fournies à des fins éducatives uniquement. Je décline toute responsabilité quant à l’utilisation de ces informations à des fins autres que celles de l’apprentissage et de la compréhension. Veuillez respecter toutes les lois et règlements applicables.">  
+
+  <title>
+    
+      Reverse Enginnering the AWS WAF Challenge
+    
+  </title>
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/" />
+  
+  
+  
+  <link rel="stylesheet" href="/css/main.ae0e4ff1c523b2a40ae2e11e7ed575aade57924f71d17b49002a29333709abf5f9471ba57824841efbe3c1298276a21f30857eb529a8246d4b0b0d05f2066b01.css" integrity="sha512-rg5P8cUjsqQK4uEeftV1qt5Xkk9x0XtJACopMzcJq/X5RxuleCSEHvvjwSmCdqIfMIV&#43;tSmoJG1LCw0F8gZrAQ==" />
+  
+</head>
+<body a="auto">
+        <main class="page-content" aria-label="Content">
+            <div class="w">
+<a href="/">..</a>
+
+
+<article>
+    <p class="post-meta">
+        <time datetime="2024-09-17 12:26:56 &#43;0200 CEST">
+            2024-09-17
+        </time>
+    </p>
+
+    <h1>Reverse Enginnering the AWS WAF Challenge</h1>
+
+    
+
+    <h2 id="introduction">Introduction</h2>
+<p>Dans cet article, je vais me plonger en profondeur sur le challenge AWS WAF pour comprendre comment il fonctionne afin de trouver un moyen de le contourner efficacement, sans passer par du Node JS.</p>
+<p>Si vous n&rsquo;avez pas lu mon premier article sur ce sujet, je vous conseille d&rsquo;aller le lire pour mieux comprendre celui-ci.</p>
+<p><a href="https://www.l0tus.me/posts/awswaf/">Article partie 1</a></p>
+<h2 id="avertissement">Avertissement</h2>
+<p>Les informations et techniques présentées dans cet article sont fournies à des fins éducatives uniquement. Je décline toute responsabilité quant à l’utilisation de ces informations à des fins autres que celles de l’apprentissage et de la compréhension. Veuillez respecter toutes les lois et règlements applicables.</p>
+<h2 id="analyse-en-profondeur">Analyse en profondeur</h2>
+<ul>
+<li>Chargement du script qui permet au navigateur de résoudre le challenge :</li>
+</ul>
+<p><img src="/images/aws_1.png" alt=""></p>
+<p>C&rsquo;est ce script qui est chargé dans la page qui contient le challenge AWS que nous devrons analyser pour comprendre son fonctionnement.</p>
+<ul>
+<li>Première requête (GET) pour recevoir un challenge à résoudre :</li>
+</ul>
+<p>Requête :
+<code>https://3f38f7f4f368.a20ab67d.eu-south-2.token.awswaf.com/3f38f7f4f368/e1fcfc58118e/inputs?client=browser</code></p>
+<p>Réponse :</p>
+<pre tabindex="0"><code>{
+    &#34;challenge&#34;: {
+        &#34;input&#34;: &#34;eyJ2ZXJzaW9uIjoxLCJ1YmlkIjoiNTc2YzY1ZjEtYjFiMC00NGUwLThiMjEtMGM5YWJjMTRjNzA4IiwiYXR0ZW1wdF9pZCI6ImM2OWJlODdjLWI0OWItNDk5Mi1iNjA2LTFlODNhYzZjMDQyMyIsImNyZWF0ZV90aW1lIjoiMjAyNC0wOS0xN1QxNzo1MToyMS43NzUwMjEzNjZaIiwiZGlmZmljdWx0eSI6OCwiY2hhbGxlbmdlX3R5cGUiOiJIYXNoY2FzaFNIQTIifQ==&#34;,
+        &#34;hmac&#34;: &#34;YJe0fQzNVCVS25oK4iy3I0bYC8Z4xUCUcAmL98dyyks=&#34;,
+        &#34;region&#34;: &#34;eu-south-2&#34;
+    },
+    &#34;challenge_type&#34;: &#34;h7b0c470f0cfe3a80a9e26526ad185f484f6817d0832712a4a37a908786a6a67f&#34;,
+    &#34;difficulty&#34;: 8
+}
+</code></pre><p>On comprends déjà qu&rsquo;il existe plusieurs types de challenge et que la difficulté va surement être utilisée dans le code pour les résoudre.</p>
+<ul>
+<li>Deuxième requête (POST) pour soumettre un challenge :</li>
+</ul>
+<p>Requête :
+<code>https://3f38f7f4f368.a20ab67d.eu-south-2.token.awswaf.com/3f38f7f4f368/e1fcfc58118e/verify</code></p>
+<p>Payload :</p>
+<pre tabindex="0"><code>{&#34;challenge&#34;:{&#34;input&#34;:&#34;eyJ2ZXJzaW9uIjoxLCJ1YmlkIjoiNTc2YzY1ZjEtYjFiMC00NGUwLThiMjEtMGM5YWJjMTRjNzA4IiwiYXR0ZW1wdF9pZCI6ImM2OWJlODdjLWI0OWItNDk5Mi1iNjA2LTFlODNhYzZjMDQyMyIsImNyZWF0ZV90aW1lIjoiMjAyNC0wOS0xN1QxNzo1MToyMS43NzUwMjEzNjZaIiwiZGlmZmljdWx0eSI6OCwiY2hhbGxlbmdlX3R5cGUiOiJIYXNoY2FzaFNIQTIifQ==&#34;,&#34;hmac&#34;:&#34;YJe0fQzNVCVS25oK4iy3I0bYC8Z4xUCUcAmL98dyyks=&#34;,&#34;region&#34;:&#34;eu-south-2&#34;},&#34;solution&#34;:&#34;712&#34;,&#34;signals&#34;:[{&#34;name&#34;:&#34;KramerAndRio&#34;,&#34;value&#34;:{&#34;Present&#34;:&#34;Q+6gIaVYqQjEp/NF::12eb519eb0c0ccf7836560aa380dc423::61a418cdc2ee61fc45ca870f6bf03ab4cdf120c3032bc5128db69b11f4b36239b0a0683c6a1a1955f98d59b990aee9b5174a90d9222f81cd0d80f1ebcea782c47ae6be14b112d10760b982b30cfac0a58b4904b82ce8efc7f1f72fe2b6f4ccc38fe46c1704d6df9b2c070be06922db50f373bcd876d02342702f1d7625685aae108559adbafe270b0f009e9fc7f69f0e36ad8a2c1db5337ed5729caed0414728f311faaa166393e3c12c3712453b56a6f7a70a97e8169a98c71f143d605c1bc6cc0935ecff76c50404ce4bca8add0e68f3734808aa0b048b7903b7008c0f14117d9fd0d54c5d29c5b2b7d8b5d4dc837d895ab19f18afd42c9eb25eca653d7e35bd6373adb9739b88079933844c059c7fbc917d6fbb2f6922ec6a2f732274b9f174e2a76d58193005ea2d0df4db84bee85080d283c23e6de2721c0a5d635d2c3e57015664e7cb1c1fd8dc4e97fc207fb5905606c9a9cc218920cdda0db707284f5d5df3a3e8964dbe9f6cd91300e689fbfb90594c6303ebbe23a586d8b1a552111233cc61563c3708a4d8342d019a5eb1e5e1c6f4e4e431d80156057685ff943d886aa7b5776b207e9556737498341c5f76ac8510b15a21ca20e509693a3e54abc680dcf9d7c3ecf4c0eeb03da765eafcc32585d3ab75bfa2bb9d8827e7538f4751ae5f9dbf309db516ad13b72fda85de1494b0fe1a50a55e1ea35a5b2b8f15df12a68457e9e96c31d787740607b2039426d79e7adcd2f9bd996f1b1a30a403b6d6c35f1ea9509421105c4400ad09a14bc75d77ca3195ccbb1a91ac6fdf2389c0406f246b7711040fc7469b2eba94a3354648d3987777e8f95c91855a15cfcf53645d1769cf553aeebe40f41be9a48ec66f3540f2c454c39332cc3deba4b06603aac495ea1845961f5fa632039d44b85b46e872da2ab3557d67159ad2e2a9d3e1400ce122a86cbca02856b61a0cb8f1ee18a2243bc01502e00ae78c76b26b05dcf592aa538cc8053598e8bcb6aaf1ea52a57d7a9d5790bd6a977f3e5af16c5d0806ea36ed8187cda115a76656fb6ebc2403ffbe48b0054e39ae7f15f878603ac3f067cf3ebbb9274b7ba6a097000e4eb16b6294e9f6989fd3dae472ff874dce6bc648e54c41f9c4a54f8e67f7f978f2140ebfd8f0b9bfa17920b8f857b6cacf943690a2fcdd421b2978585f30c78add52f13d01b40d6e337bbf789e9ff693498d8b65d1f3428fa95e335e4093069c4d557a7c85a721c5ef052860809d164674c5acf3a8866dfbccf19cf9349586b09cd557c72e184eeea9b5c401f1645e80c684abb46783f8bfc325114ab54236466fb7cf61b0d716881bb8dbd7939afe91db281dae4ed2f87557cf951bfd0c1f57acdc0da75080440e0fd8273f2eaf6709e6a70c3db8b9ef4c4730ddb028d15e9cbc9078bf4678591790c0d590c3e14e98734282c0ae9925bfbdd32a279285be2a7b7f8727e715b8da5065714d2964427fc4ebbac3e418683e22e437643d59bed6aacd959b6c96d1191eab88df1ae37ccc5f5e4ca845136f5743bb0ae15b2993b7737d4cc81c76cf6f8940a41cc0931bacfd1eeeaad2a1ca6716315d1eb4aa8b4ce20c1239107fdedaa006403e9a8f06a2070a5dbf6e6160e541780fd0f499a5aa9e10f42d95204d85451b27f1d9ed9e4d6186c7048d4bea61066a3c851b578f11b16660bbc1cbf228a568b9e32ced93e298d75cf80b6470fb2ceeb32dc6badd9f64bf03a4e436f88c8c1e7f56a9b4983bedb76409a79c30b90ce1f547ab020771fd6c87903ce75f60fcdd57077af1df3c60114b6a8946b18b3cb8c85eb8dd94205a4245efc3d55b18111cb7ff4a93e4a343eb01594ad21f438da2b772c367dd35f3cb2d62f73b92b05a01363cdf5dae68e23de4744282b16ef2bef8e7e6724cd77b935607b16c814d1dff3a4ec03e6b1b276f560762e4dfdcf9a5489b309c398b989b833541040343586f2894c43d686d2eab95dbe484e0d620e9e0f2d1a33b72eb617106ded8fd343b578c967720025e254336d99851babda59fe3483a2c157cfc1dc50af009d84b1844b43aae47a29d0e0df0995b8e8cbb55efc48873c7e21b65bc034a8048fec19fa057ba65268c5ba7a6303c8820d32da3cd6a9297cbe2d79761cc625d79fc713b91b1909dc3ddb96d10c93aac2f33b417c3bc3e32c5ebc7e1426901e5c68bc450f189699578abd9cd0dfadd4a679e041e48ee31063579bbf98253f21be3d9dfa5fb38649f19a7ff85bbce44a9886f044034884ed147cce38bbbbe98b562be7b6bb611b83b879c21ed851ab1e9b36172aefdf06def28f1bc1800c6ae2111e13ec7f9956684b676bd7ca1125725d0d0ee51d8c381bedc2e1705147dea98292b270aa462ee73d8b74b2bd6b8e9fa883d49b4afe03f1c82e7aec1e584770d675a49c201cad047a17c89950c8843d17f035ea713b03d05b041bb89cf00f4c5b0118a77edc8c439ae02a44138953d7b0644659c05e5cb2123578ea0fade1c7bd5f50acb8b939064351abceb904cfb23845610f099db029f6c117910f81c613d6508651ec4dd93ffbfecfa8b4fe53b97db0febb5813aca77c0dcad52fee2f1ea998f2ab34db60a42072937ef764134696bdc1c708b830d2c77c5dc5208e6888ffab30bb7379a377a3ac32bb4360216049556e10caf4718810ea56b44e5b3e15d787a26fc18de041ac4389d8203f1d10dff597d91f2c14524990f9a1695d176993a393d22c0a0557710734a160527dea3fc4cbeebbb57f8e67378e407583556299713406d63b089dc36da5e089c3a10ff2c6d8993b6169a256bfd1cec6de37e598e306add40091bc47dcacd58875122043ad9f364e5b1ea9f4595cea5057976ad4671d09422ba80d0c3ad0eb6df144d4220e4b28c463afd4467f897c53e34cea17e5cf92fa72f1140010ce3f9dfaa57a23e7de1d263cbb2d33422589936cd995558f2a0627efd20050cfc4f5c5af7895dd674ff82970243a57c7952519ad66578d867089b7dc16c2a42c7d92fb2afc482c078f9c2a2a607d864506947959f2e0716792b0f73dd02a04bfade4d3296c2e7dfc850ed79d3dfbebdae216e1ceaee667868145f5174daebb24010c84180ab927bf76dc53855c924eeab5e1db9b8a4a442f6c091706375158eff57ccdc4cb71d13a429cf4e6e0dc09e3b46ceedac69677b92eb87077316e581b15ee3a6636794faf96d887a56fdad25317fb0fa1a9bd390cb27059915649bdc81702cc4e76767faf53e82c1ccdc361b9f8036306ecce58419a5558959178feef9f1b94642f7efe6c809d820f4ed2d996c6a6d80b5d3a6bf9e9633489b311fd1a2ff348d643b5b5797042c6284957124c7b791a9286da5b85bd3c2e1b1c0ac5d7e345ed67659835d978edea721d36e01bbd6d05ee31e583021b9dbd44991e378ee9b040b436971a70354393ff942ccf620427f1f1e12e6d1d5dffda3e33487d8d830694e8b33fd6a60110fa59a81035f0d098a08cfcdd586508c84266a9cfb5de8c0613ee2455b0c95aa1cee6bdcfd8308ec320eb31335654f0a256720a22eb7223941d6390b525ab9352d477a198dbf15fdb8274de498e0374cf75746125ffa7ae209085d72ef9c6606767d03418aa6927749ba526957ead02ee13dd6700833d3d5a49e8480c524817d28c0063cabbc0c912f8891cbc6d1a11df35aaebe408ad73efe4d26b62565737492b9ba3235a1e1880c0dedf29a2a3e8ee841f1c397fa448e24442ff8bfacc2824a7f95ab745a1883267744ca13d47e5d43075fe372b211cb4040a9e4aec23f5fb605ae46f13f2f6c584d5349362f6c18da84da5ca512627bf263771db9991f578e3fa26501701648fbe46f7d12309060bc8503a5f9780976459a16268597f25e36b2e9a82ac2239bb85084d814a607d626b995e1cff3ee085e531bc754447ac25dc5c93d9d13389096d2ec9609016cc247877a3b820bb6bff7396ae4dd737e465a9e86174c1e59262c9f49d8437683fe1c27a4a7f978782c12618573cb4c336a89c06668087e7a5033bb3615ea588983d4f3b5f3061ad9b357fd61150737f32130d37a765ecfbd6ff3f98d533c9aaec04b3925078b1d3d6e99561030b6daad6d788dce8acba2eabb9d5cae7dd286876613693a22c9e48fd18e2c3f8edb683bd714b41aad8dc9a8074ac84e4f0328a3a06563c24ab6c9cdd5b5481cb6772ce5674ddd2eec2a7ded98486ca83fa67ebe37d77de3ef7d25119cdd260ea90a50c3e7669004427ad3c0c27d2c1160de308e503318aae190bca29a939ca619eba9e9a9da962171c44f971d139a0c85b1d8b17bb8c5d1fdf83c2df1e0aac47b07add3c9e8bd9091b680d6f15ad02d410b25b2c7ae24b644085155eca4046af92ac806ae121582a6dbcc58bf519decd9ce9945962548f81726381dd1f4fb40217a41c356efb2e381b9c4798a0a92ee00bc7a10ab87246441d36d73ec2ae5b98097e607d726e8e5568a92f8e5698a24d29f36854683ebe8621438d67fcbc6fb578d585f89e7e6ac76a7a3f5c35da8820eeae2753a36fe11e3872bdafdccba9bfd22a26ba22148279795a6c17b662e6974809a902609d7abcf343061b6ac2256cc3ba0ad42dee1d98e1cccbc7eae95243c6c48ae8eed1eee33de11fc9e11c015b60e395130edb5a08f5ce7ac1e4cc684b9c5adf8291b489b32e38ee30f945fa589fe2a25de0b5716f7c448a546f298d4f7bc612b9528c193935dcf93b437a88f6025e917f13a2007257d3cf4881cdd7cadad47eef2da0a86d7441c01a1c642d764562bd692bda1c5d204245429a02704ed646440bfcf3faf440333358a645bf7e361f47f8feaafa8d88ff5cb555c3482595f63b43efd28e4c8f463fdbb8bf31f9a48e52a42a3eb20b5338d39bb4961f6674aeeb02bbf50205121570a72bb440bcf6c1865bd4ed6ec390e06d88cbb3575b1cca8714a5e92e8678559218679f79af4340942e0eec8289fe25670a395969703500d72f916cc3e3ce2c876f9baefd8e326a4e1b8dc1b966cb75f4f6a827e204fe2d633ca035f7b913db6599c084c65ce58c481da4ea68125e1b812fb67c53742f9f91a03cc3d7ef7d5e3ab05efb57c6ffeac8bb5d067fa95e92a5ea8aeeb981f705bd4769cbc7287d23a4c4ad40ab524ec8a20c0109d67b5b1eb68d304beba8b5a51a551444e0b38ddb64658d977277d34d90d248239883623866830d509d8425ce434e233b4a7ff23c91652cc809da9ab84a3d0f990222e9b2faaacf70c1c2ddf22835dfbb9d47d06b6a0224ea6907e18fe70c13062052bad3005061d8002a0b0d1fd71ca2ad45a4b488087a08fa80c3dc9e7f863850c3ece16b7904ce8a08a42d161e049ad2f5165dbcce91bdef1f8dbd2eebcbc183099dca507df3fb802c764c8fb30c4cf0e068d7a3a3961298c0939107c2cd0a9c68c26766d1ef6db4dc50aeb52d40e668a154db3795e15fe5fe345f6430b96878b5b166b7372cfae58144e153508b4c6d8fb8d8420f3b9761f5c7266c6b5a6b6bba1c385f43a62c1529fd99e4d51505165a08e1506a5c21632895cbba5e1764a0f640a86dd7be5&#34;}}],&#34;checksum&#34;:&#34;2873EF02&#34;,&#34;existing_token&#34;:null,&#34;client&#34;:&#34;Browser&#34;,&#34;domain&#34;:&#34;auth.ankama.com&#34;,&#34;metrics&#34;:[{&#34;name&#34;:&#34;2&#34;,&#34;value&#34;:0.699999988079071,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;100&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;101&#34;,&#34;value&#34;:1,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;102&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;103&#34;,&#34;value&#34;:14,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;104&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;105&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;106&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;107&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;108&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;undefined&#34;,&#34;value&#34;:1,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;110&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;111&#34;,&#34;value&#34;:9,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;112&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;undefined&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;3&#34;,&#34;value&#34;:5.800000011920929,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;7&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;4&#34;},{&#34;name&#34;:&#34;1&#34;,&#34;value&#34;:33.89999997615814,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;4&#34;,&#34;value&#34;:29.5,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;5&#34;,&#34;value&#34;:0,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;6&#34;,&#34;value&#34;:63.39999997615814,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;0&#34;,&#34;value&#34;:562.8000000119209,&#34;unit&#34;:&#34;2&#34;},{&#34;name&#34;:&#34;8&#34;,&#34;value&#34;:1,&#34;unit&#34;:&#34;4&#34;}]}
+</code></pre><p>Réponse :</p>
+<pre tabindex="0"><code>{
+    &#34;token&#34;: &#34;b8eee737-fbdb-4173-b6ce-8a0ded45dbfe:HQoAsM19XXwBAAAA:2PUWxgdu41le7k9hZOpiDNqdrOL6hEmKzmuQTP6w3+/99H0FJLjoRFEcPiXvWtuEgv6IE/+qT/6jqMtqo5CGgJfNPvh3d/Zl0bEU8O8xCqzFxLYKXAtiABM8yt+V14ASLoQmTpSjRIXx9jcpjIHC2Q81dtxuuOJWdad4aVWxeQY0M7M2B/kRIhRJzCpWx20b4oA=&#34;,
+    &#34;inputs&#34;: null
+}
+</code></pre><p>Je vais donc commencer à déobfusquer puis analyser le script js qui permet d&rsquo;envoyer toutes les données contenues dans la deuxième requête :</p>
+<p><img src="/images/aws2_1.png" alt=""></p>
+<p>On peut voir dans cette fonction <code>collectAndEncrypt</code> partiellement déobfusquée que le script va récupérer des données du navigateur, puis les encoder avant de les chiffrer.</p>
+<p><img src="/images/aws2_2.png" alt=""></p>
+<p>Voici comment est définie la variable <code>encoding_object</code>.</p>
+<p>Pour accèder à sa méthode collecte, on peut rajouter cette ligne : <code>console.log(encoding_object.encode.toString());</code> afin d&rsquo;aller chercher son contenu dans le script.</p>
+<p>Voici comment sont encodées les données récupérées :</p>
+<p><img src="/images/aws2_3.png" alt=""></p>
+<p>Explication du processus :</p>
+<ul>
+<li>Les données sont transformées au format JSON</li>
+<li>Elles sont ensuite encodées en UTF8</li>
+<li>Une valeur est calculée en fonction de ces données (cette valeur est appelée checksum) et sert à valider leur intégrité</li>
+<li>Les données sont renvoyées dans ce format : <code>{checksum}#{données encodées}</code></li>
+</ul>
+<p>Allons maintenant chercher la fonction pour caculer le checksum :</p>
+<p><img src="/images/aws2_4.png" alt=""></p>
+<p>Voici une réimplémentation en python où l&rsquo;on passe une chaine json pour calculer son checksum :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">build_crc_table</span>():
+</span></span><span style="display:flex;"><span>    POLYNOMIAL <span style="color:#f92672">=</span> <span style="color:#ae81ff">0xedb88320</span>
+</span></span><span style="display:flex;"><span>    table <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">256</span>):
+</span></span><span style="display:flex;"><span>        crc <span style="color:#f92672">=</span> i
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">for</span> j <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">8</span>):
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> crc <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">1</span>:
+</span></span><span style="display:flex;"><span>                crc <span style="color:#f92672">=</span> (crc <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">1</span>) <span style="color:#f92672">^</span> POLYNOMIAL
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>                crc <span style="color:#f92672">&gt;&gt;=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>        table<span style="color:#f92672">.</span>append(crc)
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> table
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">calculate_crc32</span>(data):
+</span></span><span style="display:flex;"><span>    crc_table <span style="color:#f92672">=</span> build_crc_table()
+</span></span><span style="display:flex;"><span>    crc <span style="color:#f92672">=</span> <span style="color:#ae81ff">0xffffffff</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> data:
+</span></span><span style="display:flex;"><span>        crc <span style="color:#f92672">=</span> (crc <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">8</span>) <span style="color:#f92672">^</span> crc_table[(crc <span style="color:#f92672">^</span> byte) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>]
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> crc <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xffffffff</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">calculate_checksum</span>(payload):
+</span></span><span style="display:flex;"><span>    utf8_encoded <span style="color:#f92672">=</span> payload<span style="color:#f92672">.</span>encode(<span style="color:#e6db74">&#39;utf-8&#39;</span>)
+</span></span><span style="display:flex;"><span>    crc32_value <span style="color:#f92672">=</span> calculate_crc32(utf8_encoded)
+</span></span><span style="display:flex;"><span>    hex_encoded <span style="color:#f92672">=</span> hex_encode(crc32_value)
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> hex_encoded
+</span></span></code></pre></div><p>On peut maintenant se concentrer sur le chiffrement de ces données (ainsi que sur le déchiffrement).</p>
+<p>Voici la fonction qui permet de chiffrer ces données :</p>
+<p><img src="/images/aws2_5.png" alt=""></p>
+<p>Explication du processus :</p>
+<ul>
+<li>Un identifier est récupéré dans une classe <code>keyProvider</code></li>
+<li>La clé de chiffrement est hardcodé</li>
+<li>Un iv aléatoire de 12 bytes est généré</li>
+<li>Un chiffrement AES-GCM est appliqué sur les données</li>
+<li>Le résultat est renvoyé dans ce format : <code>{identifier}::{iv en base64}::{tag_hex}::{données chiffrées}</code></li>
+</ul>
+<p>Penchons nous du côté du KeyProvider :</p>
+<p><img src="/images/aws2_6.png" alt=""></p>
+<p>L&rsquo;<code>identifier</code> est hardcodé et <code>material</code> n&rsquo;est pas utilisé dans le chiffrement.</p>
+<p>Avec ces infos, on peut réimplémenter la lib de chiffrement en python :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">KeyProvider</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">provide</span>(self):
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> {
+</span></span><span style="display:flex;"><span>            <span style="color:#e6db74">&#39;identifier&#39;</span>: <span style="color:#e6db74">&#34;KramerAndRio&#34;</span>,
+</span></span><span style="display:flex;"><span>            <span style="color:#e6db74">&#39;material&#39;</span>: bytes([
+</span></span><span style="display:flex;"><span>                <span style="color:#ae81ff">0x4e</span>, <span style="color:#ae81ff">0x2f</span>, <span style="color:#ae81ff">0x88</span>, <span style="color:#ae81ff">0xb3</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#ae81ff">0x12</span>, <span style="color:#ae81ff">0x9d</span>, <span style="color:#ae81ff">0x1b</span>, <span style="color:#ae81ff">0x4e</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#ae81ff">0x79</span>, <span style="color:#ae81ff">0xcf</span>, <span style="color:#ae81ff">0x37</span>, <span style="color:#ae81ff">0x69</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#ae81ff">0xea</span>, <span style="color:#ae81ff">0xb4</span>, <span style="color:#ae81ff">0x5b</span>, <span style="color:#ae81ff">0xcf</span>
+</span></span><span style="display:flex;"><span>            ])
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Encryptor</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> __init__(self, key_provider):
+</span></span><span style="display:flex;"><span>        self<span style="color:#f92672">.</span>key_provider <span style="color:#f92672">=</span> key_provider
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">encrypt</span>(self, plaintext):
+</span></span><span style="display:flex;"><span>        key_data <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>key_provider<span style="color:#f92672">.</span>provide()
+</span></span><span style="display:flex;"><span>        identifier <span style="color:#f92672">=</span> key_data[<span style="color:#e6db74">&#39;identifier&#39;</span>]
+</span></span><span style="display:flex;"><span>        key_material <span style="color:#f92672">=</span> key_data[<span style="color:#e6db74">&#39;material&#39;</span>]
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        hex_key <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;93d9f6846b629edb2bdc4466af627d998496cb0c08f9cf043de68d6b25aa9693&#34;</span>
+</span></span><span style="display:flex;"><span>        key <span style="color:#f92672">=</span> binascii<span style="color:#f92672">.</span>unhexlify(hex_key)
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        iv <span style="color:#f92672">=</span> os<span style="color:#f92672">.</span>urandom(<span style="color:#ae81ff">12</span>)
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        cipher <span style="color:#f92672">=</span> Cipher(algorithms<span style="color:#f92672">.</span>AES(key), modes<span style="color:#f92672">.</span>GCM(iv), backend<span style="color:#f92672">=</span>default_backend())
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        encryptor <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encryptor()
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        ciphertext <span style="color:#f92672">=</span> encryptor<span style="color:#f92672">.</span>update(plaintext<span style="color:#f92672">.</span>encode()) <span style="color:#f92672">+</span> encryptor<span style="color:#f92672">.</span>finalize()
+</span></span><span style="display:flex;"><span>        tag <span style="color:#f92672">=</span> encryptor<span style="color:#f92672">.</span>tag
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        iv_encoded <span style="color:#f92672">=</span> base64<span style="color:#f92672">.</span>b64encode(iv)<span style="color:#f92672">.</span>decode(<span style="color:#e6db74">&#39;utf-8&#39;</span>)
+</span></span><span style="display:flex;"><span>        tag_hex <span style="color:#f92672">=</span> tag<span style="color:#f92672">.</span>hex()
+</span></span><span style="display:flex;"><span>        ciphertext_hex <span style="color:#f92672">=</span> ciphertext<span style="color:#f92672">.</span>hex()
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>        result <span style="color:#f92672">=</span> <span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{</span>identifier<span style="color:#e6db74">}</span><span style="color:#e6db74">::</span><span style="color:#e6db74">{</span>iv_encoded<span style="color:#e6db74">}</span><span style="color:#e6db74">::</span><span style="color:#e6db74">{</span>tag_hex<span style="color:#e6db74">}</span><span style="color:#e6db74">::</span><span style="color:#e6db74">{</span>ciphertext_hex<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> result
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">decrypt</span>(self, iv_encoded, tag_hex, ciphertext_hex):
+</span></span><span style="display:flex;"><span>        key_data <span style="color:#f92672">=</span> self<span style="color:#f92672">.</span>key_provider<span style="color:#f92672">.</span>provide()
+</span></span><span style="display:flex;"><span>        key_material <span style="color:#f92672">=</span> key_data[<span style="color:#e6db74">&#39;material&#39;</span>]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        hex_key <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;93d9f6846b629edb2bdc4466af627d998496cb0c08f9cf043de68d6b25aa9693&#34;</span>
+</span></span><span style="display:flex;"><span>        key <span style="color:#f92672">=</span> binascii<span style="color:#f92672">.</span>unhexlify(hex_key)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        iv <span style="color:#f92672">=</span> base64<span style="color:#f92672">.</span>b64decode(iv_encoded)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        tag <span style="color:#f92672">=</span> bytes<span style="color:#f92672">.</span>fromhex(tag_hex)
+</span></span><span style="display:flex;"><span>        ciphertext <span style="color:#f92672">=</span> bytes<span style="color:#f92672">.</span>fromhex(ciphertext_hex)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        cipher <span style="color:#f92672">=</span> Cipher(algorithms<span style="color:#f92672">.</span>AES(key), modes<span style="color:#f92672">.</span>GCM(iv, tag), backend<span style="color:#f92672">=</span>default_backend())
+</span></span><span style="display:flex;"><span>        decryptor <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>decryptor()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        plaintext <span style="color:#f92672">=</span> decryptor<span style="color:#f92672">.</span>update(ciphertext) <span style="color:#f92672">+</span> decryptor<span style="color:#f92672">.</span>finalize()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> plaintext<span style="color:#f92672">.</span>decode(<span style="color:#e6db74">&#39;utf-8&#39;</span>)
+</span></span></code></pre></div><p>Ce format de données est visible dans le payload envoyé lors de la requête de validation du challenge à cet endroit la :</p>
+<p><img src="/images/aws2_7.png" alt=""></p>
+<p>L&rsquo;identifier a été séparé des données, mais nous pouvons utiliser notre code python pour déchiffrer les données :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">test_decrypt</span>():
+</span></span><span style="display:flex;"><span>    key_provider <span style="color:#f92672">=</span> KeyProvider()
+</span></span><span style="display:flex;"><span>    encryptor <span style="color:#f92672">=</span> Encryptor(key_provider)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    iv_encoded <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Q+6gIaVYqQjEp/NF&#34;</span>
+</span></span><span style="display:flex;"><span>    tag_hex <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;12eb519eb0c0ccf7836560aa380dc423&#34;</span>
+</span></span><span style="display:flex;"><span>    ciphertext_hex <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;61a418cdc2ee61fc45ca870f6bf03ab4cdf120c3032bc5128db69b11f4b36239b0a0683..............&#34;</span> <span style="color:#75715e"># TROP LONG</span>
+</span></span><span style="display:flex;"><span>    decrypted <span style="color:#f92672">=</span> encryptor<span style="color:#f92672">.</span>decrypt(iv_encoded, tag_hex, ciphertext_hex)
+</span></span><span style="display:flex;"><span>    print(decrypted)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>test_decrypt()
+</span></span></code></pre></div><p><img src="/images/aws2_8.png" alt=""></p>
+<p>On a bien réussi à déchiffrer les données et on retrouve notre format avec le checksum suivi de <code>#</code> suivi des données en json.</p>
+<p>Voici les données dans un format un peu plus propre :</p>
+<p><img src="/images/aws2_9.png" alt=""></p>
+<p>Comme prévu, les données sont des données de navigateur, elles peuvent être hardcodées dans notre code pour simuler n&rsquo;importe quel navigateur à l&rsquo;exception de <code>start</code> et <code>end</code> qui correspondent aux timestamps de début et de fin de récupération des données, ainsi que de <code>id</code> qui est un uuid4 généré aléatoirement.</p>
+<p>Si on s&rsquo;intéresse maintenant aux autres données envoyés pour la validation du challenge :</p>
+<p><img src="/images/aws2_10.png" alt=""></p>
+<p>Le champ <code>challenge</code> correspond au challenge récupéré lors de la première requête.</p>
+<p>Ce qui nous intéresse, c&rsquo;est le champ <code>solution</code> qui contient la solution au challenge !</p>
+<p>Voici le code qui gère la partie de résolution du challenge :</p>
+<p><img src="/images/aws2_11.png" alt=""></p>
+<p>Explication du processus :</p>
+<ul>
+<li>La fonction a utilisée est determinée en fonction du hash <code>challenge_type</code></li>
+<li>La fonction en question est appelée avec l&rsquo;input du challenge, le checksum ainsi que sa difficulté et la mémoire (qui n&rsquo;est pas utilisée)</li>
+</ul>
+<p>Voici l&rsquo;endroit qui relie les types de challenge à leur fonction respective :</p>
+<p><img src="/images/aws2_12.png" alt=""></p>
+<p>Il y a deux types de challenge différents mais pour des questions de temps, je vais m&rsquo;intéresser au challenge 2.</p>
+<p>Voici la fonction reliée au challenge 2 :</p>
+<p><img src="/images/aws2_13.png" alt=""></p>
+<p>Explication du processus :</p>
+<ul>
+<li>L&rsquo;input du challenge et le checksum sont concaténés</li>
+<li>La fonction entre dans une boucle infinie avec un incrémentateur</li>
+<li>A chaque itération, l&rsquo;incrémentateur est concaténé à l&rsquo;input du challenge et au checksum</li>
+<li>Cette nouvelle chaine est hashé avec l&rsquo;algorithme SHA256</li>
+<li>Le hashage résultant est passé à une fonction <code>satisfy_difficulty</code> pour savoir s&rsquo;il faut arrêter la boucle</li>
+<li>Si le hashage ne satisfait pas la difficulté, on incrémente de 1 et on repasse dans la boucle</li>
+<li>L&rsquo;incrémentateur est retourné à la fin de notre fonction, c&rsquo;est la solution du challenge !</li>
+</ul>
+<p>Voici une implémentation en python pour avoir la solution du challenge 2 :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">satisfy_difficulty</span>(difficulty, hash_string):
+</span></span><span style="display:flex;"><span>    hex_to_bin <span style="color:#f92672">=</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#39;0&#39;</span>: <span style="color:#e6db74">&#39;0000&#39;</span>, <span style="color:#e6db74">&#39;1&#39;</span>: <span style="color:#e6db74">&#39;0001&#39;</span>, <span style="color:#e6db74">&#39;2&#39;</span>: <span style="color:#e6db74">&#39;0010&#39;</span>, <span style="color:#e6db74">&#39;3&#39;</span>: <span style="color:#e6db74">&#39;0011&#39;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#39;4&#39;</span>: <span style="color:#e6db74">&#39;0100&#39;</span>, <span style="color:#e6db74">&#39;5&#39;</span>: <span style="color:#e6db74">&#39;0101&#39;</span>, <span style="color:#e6db74">&#39;6&#39;</span>: <span style="color:#e6db74">&#39;0110&#39;</span>, <span style="color:#e6db74">&#39;7&#39;</span>: <span style="color:#e6db74">&#39;0111&#39;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#39;8&#39;</span>: <span style="color:#e6db74">&#39;1000&#39;</span>, <span style="color:#e6db74">&#39;9&#39;</span>: <span style="color:#e6db74">&#39;1001&#39;</span>, <span style="color:#e6db74">&#39;A&#39;</span>: <span style="color:#e6db74">&#39;1010&#39;</span>, <span style="color:#e6db74">&#39;B&#39;</span>: <span style="color:#e6db74">&#39;1011&#39;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#39;C&#39;</span>: <span style="color:#e6db74">&#39;1100&#39;</span>, <span style="color:#e6db74">&#39;D&#39;</span>: <span style="color:#e6db74">&#39;1101&#39;</span>, <span style="color:#e6db74">&#39;E&#39;</span>: <span style="color:#e6db74">&#39;1110&#39;</span>, <span style="color:#e6db74">&#39;F&#39;</span>: <span style="color:#e6db74">&#39;1111&#39;</span>
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    bin_string <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;&#39;</span><span style="color:#f92672">.</span>join(hex_to_bin[char<span style="color:#f92672">.</span>upper()] <span style="color:#66d9ef">for</span> char <span style="color:#f92672">in</span> hash_string[:difficulty <span style="color:#f92672">//</span> <span style="color:#ae81ff">4</span>])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    bin_int <span style="color:#f92672">=</span> int(bin_string[:difficulty], <span style="color:#ae81ff">2</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> bin_int <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">sha256_hash</span>(input_string):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> hashlib<span style="color:#f92672">.</span>sha256(input_string<span style="color:#f92672">.</span>encode())<span style="color:#f92672">.</span>hexdigest()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">encode64</span>(input_bytes):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> base64<span style="color:#f92672">.</span>b64encode(input_bytes)<span style="color:#f92672">.</span>decode()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_solution_2</span>(payload):
+</span></span><span style="display:flex;"><span>    difficulty <span style="color:#f92672">=</span> payload[<span style="color:#e6db74">&#39;difficulty&#39;</span>]
+</span></span><span style="display:flex;"><span>    input_string <span style="color:#f92672">=</span> payload[<span style="color:#e6db74">&#39;input&#39;</span>]
+</span></span><span style="display:flex;"><span>    checksum <span style="color:#f92672">=</span> payload[<span style="color:#e6db74">&#39;checksum&#39;</span>]
+</span></span><span style="display:flex;"><span>    memory <span style="color:#f92672">=</span> payload[<span style="color:#e6db74">&#39;memory&#39;</span>]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    input_checksum_concat <span style="color:#f92672">=</span> input_string <span style="color:#f92672">+</span> checksum
+</span></span><span style="display:flex;"><span>    incrementor <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> <span style="color:#66d9ef">True</span>:
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        input_checksum_0_concat <span style="color:#f92672">=</span> input_checksum_concat <span style="color:#f92672">+</span> str(incrementor)
+</span></span><span style="display:flex;"><span>        input_checksum_encoded <span style="color:#f92672">=</span> input_checksum_0_concat<span style="color:#f92672">.</span>encode()
+</span></span><span style="display:flex;"><span>        hash_result <span style="color:#f92672">=</span> hashlib<span style="color:#f92672">.</span>sha256(input_checksum_encoded)<span style="color:#f92672">.</span>hexdigest()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> satisfy_difficulty(difficulty, hash_result):
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">return</span> str(incrementor)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        incrementor <span style="color:#f92672">+=</span> <span style="color:#ae81ff">1</span>
+</span></span></code></pre></div><p>Voila ! Nous avons tous les éléments requis pour contourner ce challenge sans utilisation de navigateur ou de node JS.</p>
+<h2 id="contournement-final">Contournement final</h2>
+<p>Etapes à mettre en place :</p>
+<ul>
+<li>Hardcoder les données du navigateur selon les besoins (faire croire que nous somme sur tablette par exemple)</li>
+<li>Calculer le checksum qui correspond à ces données</li>
+<li>Chiffrer ces données avec ce format : <code>{checksum}#{données}</code> à l&rsquo;aide de notre implémentation du chiffrement</li>
+<li>Récupérer un challenge à l&rsquo;aide de la première requête GET</li>
+<li>Calculer la solution à ce challenge à l&rsquo;aide de notre fonction</li>
+<li>Créer un payload bien formatté (hardcoder les données restantes selon les besoins)</li>
+<li>Faire une requête POST pour envoyer notre résolution du challenge</li>
+<li>Récupérer le token aws dans la réponse !</li>
+</ul>
+<p>Voici un code python permettant de le faire :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">main</span>():
+</span></span><span style="display:flex;"><span>    key_provider <span style="color:#f92672">=</span> KeyProvider()
+</span></span><span style="display:flex;"><span>    encryptor <span style="color:#f92672">=</span> Encryptor(key_provider)
+</span></span><span style="display:flex;"><span>    metrics <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;{&#34;metrics&#34;:{&#34;fp2&#34;:0,&#34;browser&#34;:1,&#34;capabilities&#34;:0,&#34;gpu&#34;:1,&#34;dnt&#34;:0,&#34;math&#34;:0,&#34;screen&#34;:0,&#34;navigator&#34;:0,&#34;auto&#34;:0,&#34;stealth&#34;:0,&#34;subtle&#34;:1,&#34;canvas&#34;:39,&#34;formdetector&#34;:1,&#34;be&#34;:2},&#34;start&#34;:&#39;</span> <span style="color:#f92672">+</span> str(int(time<span style="color:#f92672">.</span>time())) <span style="color:#f92672">+</span> <span style="color:#e6db74">&#39;,&#34;gpu&#34;:null,&#34;math&#34;:{&#34;tan&#34;:&#34;-1.4214488238747245&#34;,&#34;sin&#34;:&#34;0.8178819121159085&#34;,&#34;cos&#34;:&#34;-0.5753861119575491&#34;},&#34;flashVersion&#34;:null,&#34;plugins&#34;:[],&#34;crypto&#34;:{&#34;crypto&#34;:1,&#34;subtle&#34;:0,&#34;encrypt&#34;:0,&#34;decrypt&#34;:0,&#34;wrapKey&#34;:0,&#34;unwrapKey&#34;:0,&#34;sign&#34;:0,&#34;verify&#34;:0,&#34;digest&#34;:0,&#34;deriveBits&#34;:0,&#34;deriveKey&#34;:0,&#34;getRandomValues&#34;:true,&#34;randomUUID&#34;:true},&#34;canvas&#34;:{&#34;hash&#34;:-1653648953,&#34;emailHash&#34;:null,&#34;histogramBins&#34;:[14105,70,77,57,51,65,65,49,47,46,49,39,30,25,40,45,29,55,37,46,48,45,32,26,19,24,39,27,51,34,31,23,21,28,25,31,24,28,32,34,38,15,19,28,22,31,13,22,24,18,39,24,25,35,34,20,19,27,18,17,28,21,19,22,16,20,18,18,20,20,22,25,41,11,26,28,17,23,19,19,20,26,23,9,27,37,28,20,37,12,29,25,38,22,10,25,24,22,39,24,57,26,511,38,26,21,22,30,17,11,24,23,43,25,25,17,24,21,19,59,44,27,32,23,31,26,20,64,18,10,16,28,24,34,33,34,57,17,18,18,16,18,25,23,17,23,21,21,13,26,20,35,21,91,20,29,20,24,11,27,22,23,10,22,23,27,12,32,27,23,25,32,23,17,26,32,17,19,24,30,14,29,27,19,14,29,14,23,25,28,7,25,14,19,20,34,25,38,29,35,35,39,33,20,30,36,22,25,45,29,32,18,28,34,18,29,21,25,23,27,40,30,28,17,37,32,41,43,41,54,18,29,24,34,37,61,51,51,36,35,32,50,55,52,49,65,48,60,67,78,81,70,81,79,205,13505]},&#34;formDetected&#34;:true,&#34;numForms&#34;:1,&#34;numFormElements&#34;:4,&#34;be&#34;:{&#34;si&#34;:false},&#34;end&#34;:&#39;</span> <span style="color:#f92672">+</span> str(int(time<span style="color:#f92672">.</span>time()) <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>) <span style="color:#f92672">+</span> <span style="color:#e6db74">&#39;,&#34;errors&#34;:[{&#34;collector&#34;:&#34;fp2&#34;,&#34;message&#34;:&#34;screen is not defined&#34;},{&#34;collector&#34;:&#34;browser&#34;,&#34;message&#34;:&#34;navigator is not defined&#34;},{&#34;collector&#34;:&#34;capabilities&#34;,&#34;message&#34;:&#34;navigator is not defined&#34;},{&#34;collector&#34;:&#34;dnt&#34;,&#34;message&#34;:&#34;navigator is not defined&#34;},{&#34;collector&#34;:&#34;screen&#34;,&#34;message&#34;:&#34;screen is not defined&#34;},{&#34;collector&#34;:&#34;auto&#34;,&#34;message&#34;:&#34;navigator is not defined&#34;}],&#34;version&#34;:&#34;2.3.0&#34;,&#34;id&#34;:&#34;&#39;</span> <span style="color:#f92672">+</span> str(uuid<span style="color:#f92672">.</span>uuid4()) <span style="color:#f92672">+</span> <span style="color:#e6db74">&#39;&#34;}&#39;</span>
+</span></span><span style="display:flex;"><span>    checksum <span style="color:#f92672">=</span> calculate_checksum(metrics)
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;Checksum calculé :&#34;</span>, checksum)
+</span></span><span style="display:flex;"><span>    encrypted_data <span style="color:#f92672">=</span> encryptor<span style="color:#f92672">.</span>encrypt(checksum <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;#&#34;</span> <span style="color:#f92672">+</span> metrics)
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;Début des données chiffrées :&#34;</span>, encrypted_data[:<span style="color:#ae81ff">50</span>])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;Récupération d&#39;un challenge&#34;</span>)
+</span></span><span style="display:flex;"><span>    r <span style="color:#f92672">=</span> requests<span style="color:#f92672">.</span>get(<span style="color:#e6db74">&#34;https://3f38f7f4f368.a20ab67d.eu-south-2.token.awswaf.com/3f38f7f4f368/e1fcfc58118e/inputs?client=browser&#34;</span>)
+</span></span><span style="display:flex;"><span>    resp <span style="color:#f92672">=</span> r<span style="color:#f92672">.</span>json()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    inputx <span style="color:#f92672">=</span> resp[<span style="color:#e6db74">&#34;challenge&#34;</span>][<span style="color:#e6db74">&#34;input&#34;</span>]
+</span></span><span style="display:flex;"><span>    difficulty <span style="color:#f92672">=</span> resp[<span style="color:#e6db74">&#34;difficulty&#34;</span>]
+</span></span><span style="display:flex;"><span>    memory <span style="color:#f92672">=</span> <span style="color:#ae81ff">128</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    payload <span style="color:#f92672">=</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;input&#34;</span>: str(inputx),
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;checksum&#34;</span>: str(checksum),
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;difficulty&#34;</span>: int(difficulty),
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;memory&#34;</span>: int(memory)
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;Challenge récupéré&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    solution <span style="color:#f92672">=</span> get_solution_2(payload)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;Solution au challenge :&#34;</span>, str(solution))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    final_payload <span style="color:#f92672">=</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;challenge&#34;</span>: resp[<span style="color:#e6db74">&#34;challenge&#34;</span>],
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;solution&#34;</span>: str(solution),
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;checksum&#34;</span>: str(checksum),
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;existing_token&#34;</span>: <span style="color:#e6db74">&#34;&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;client&#34;</span>: <span style="color:#e6db74">&#34;Browser&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;domain&#34;</span>: <span style="color:#e6db74">&#34;auth.ankama.com&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;signals&#34;</span>: [
+</span></span><span style="display:flex;"><span>            {
+</span></span><span style="display:flex;"><span>                <span style="color:#e6db74">&#34;name&#34;</span>: <span style="color:#e6db74">&#34;KramerAndRio&#34;</span>,
+</span></span><span style="display:flex;"><span>                <span style="color:#e6db74">&#34;value&#34;</span>: {<span style="color:#e6db74">&#34;Present&#34;</span>: encrypted_data<span style="color:#f92672">.</span>replace(<span style="color:#e6db74">&#34;KramerAndRio::&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>)}
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>        ],
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;metrics&#34;</span>: [{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">0.5608000000000288</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;100&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">1</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;101&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">0</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;102&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">1</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;103&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">0</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;104&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">0</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;105&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">0</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;106&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">0</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;107&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">0</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;108&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">1</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;undefined&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">0</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;110&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">0</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;111&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">40</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;112&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">1</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;undefined&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">2</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;3&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">13.910499999999956</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;7&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">0</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;4&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;1&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">64.99780000000004</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;4&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">6.26909999999998</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;5&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">0.0013000000000147338</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;6&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">71.27339999999998</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;2&#34;</span>},{<span style="color:#e6db74">&#34;name&#34;</span>:<span style="color:#e6db74">&#34;8&#34;</span>,<span style="color:#e6db74">&#34;value&#34;</span>:<span style="color:#ae81ff">1</span>,<span style="color:#e6db74">&#34;unit&#34;</span>:<span style="color:#e6db74">&#34;4&#34;</span>}]
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    headers <span style="color:#f92672">=</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;accept&#34;</span>:<span style="color:#e6db74">&#34;*/*&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;accept-encoding&#34;</span>:<span style="color:#e6db74">&#34;gzip, deflate, br, zstd&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;accept-language&#34;</span>:<span style="color:#e6db74">&#34;fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;content-type&#34;</span>:<span style="color:#e6db74">&#34;text/plain;charset=UTF-8&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;priority&#34;</span>:<span style="color:#e6db74">&#34;u=1, i&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;sec-ch-ua&#34;</span>:<span style="color:#e6db74">&#39;&#34;Chromium&#34;;v=&#34;128&#34;, &#34;Not;A=Brand&#34;;v=&#34;24&#34;, &#34;Google Chrome&#34;;v=&#34;128&#34;&#39;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;sec-ch-ua-mobile&#34;</span>:<span style="color:#e6db74">&#34;?0&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;sec-ch-ua-platform&#34;</span>:<span style="color:#e6db74">&#39;&#34;Windows&#34;&#39;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;sec-fetch-dest&#34;</span>:<span style="color:#e6db74">&#34;empty&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;sec-fetch-mode&#34;</span>:<span style="color:#e6db74">&#34;cors&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;sec-fetch-site&#34;</span>:<span style="color:#e6db74">&#34;cross-site&#34;</span>,
+</span></span><span style="display:flex;"><span>        <span style="color:#e6db74">&#34;user-agent&#34;</span>:<span style="color:#e6db74">&#34;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36&#34;</span>
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;Envoie de la requête de validation du challenge&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    r2 <span style="color:#f92672">=</span> requests<span style="color:#f92672">.</span>post(<span style="color:#e6db74">&#34;https://3f38f7f4f368.a20ab67d.eu-south-2.token.awswaf.com/3f38f7f4f368/e1fcfc58118e/verify&#34;</span>, json<span style="color:#f92672">=</span>final_payload, headers<span style="color:#f92672">=</span>headers)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;Token récupéré : &#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    print(r2<span style="color:#f92672">.</span>json()[<span style="color:#e6db74">&#34;token&#34;</span>])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>main()
+</span></span></code></pre></div><p>On peut maintenant tester son execution :</p>
+<p><img src="/images/aws2_14.png" alt=""></p>
+<p>Et voila ! Tout marche comme prévu et on peut maintenant contourner efficacement le WAF AWS !</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>Vous pouvez trouver le code entier de cette PoC sur mon <a href="https://github.com/l0tus77/aws-waf-challenge-bypass/">github</a>, merci d&rsquo;avoir lu jusqu&rsquo;au bout et n&rsquo;hésitez pas à me faire des retours !</p>
+
+</article>
+
+            </div>
+        </main>
+    </body></html>

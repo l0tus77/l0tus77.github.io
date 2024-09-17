@@ -6,8 +6,15 @@
     <description>Recent content in Posts on L0tus Blog</description>
     <generator>Hugo</generator>
     <language>en-us</language>
-    <lastBuildDate>Mon, 16 Sep 2024 12:26:56 +0200</lastBuildDate>
+    <lastBuildDate>Tue, 17 Sep 2024 12:26:56 +0200</lastBuildDate>
     <atom:link href="https://l0tus77.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Reverse Enginnering the AWS WAF Challenge</title>
+      <link>https://l0tus77.github.io/posts/awsreverse/</link>
+      <pubDate>Tue, 17 Sep 2024 12:26:56 +0200</pubDate>
+      <guid>https://l0tus77.github.io/posts/awsreverse/</guid>
+      <description>&lt;h2 id=&#34;introduction&#34;&gt;Introduction&lt;/h2&gt;&#xA;&lt;p&gt;Dans cet article, je vais me plonger en profondeur sur le challenge AWS WAF pour comprendre comment il fonctionne afin de trouver un moyen de le contourner efficacement, sans passer par du Node JS.&lt;/p&gt;&#xA;&lt;p&gt;Si vous n&amp;rsquo;avez pas lu mon premier article sur ce sujet, je vous conseille d&amp;rsquo;aller le lire pour mieux comprendre celui-ci.&lt;/p&gt;&#xA;&lt;p&gt;&lt;a href=&#34;https://www.l0tus.me/posts/awswaf/&#34;&gt;Article partie 1&lt;/a&gt;&lt;/p&gt;&#xA;&lt;h2 id=&#34;avertissement&#34;&gt;Avertissement&lt;/h2&gt;&#xA;&lt;p&gt;Les informations et techniques présentées dans cet article sont fournies à des fins éducatives uniquement. Je décline toute responsabilité quant à l’utilisation de ces informations à des fins autres que celles de l’apprentissage et de la compréhension. Veuillez respecter toutes les lois et règlements applicables.&lt;/p&gt;</description>
+    </item>
     <item>
       <title>Bypassing AWS WAF Challenge without Selenium / Capsolver</title>
       <link>https://l0tus77.github.io/posts/awswaf/</link>
