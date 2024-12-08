@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en-us"><head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+   <meta name="description" content="Introduction
+BasicFit est une chaine de salle de sport mondiale qui propose un système d&rsquo;accès aux salles par QRcode.
+Les QRcode changent toutes les 7 secondes et les screens et enregistrements d&rsquo;écran sont bloqués, afin de permettre l&rsquo;accès à la salle de sport depuis seulement un unique appareil.
+Dans cet article nous allons voir comment il est possible de trouver l&rsquo;algorithme de génération des QRcode afin de le répliquer en dehors de l&rsquo;application mobile.">  
+
+  <title>
+    
+      Reverse Enginnering the BasicFit QRCode
+    
+  </title>
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/" />
+  
+  
+  
+  <link rel="stylesheet" href="/css/main.ae0e4ff1c523b2a40ae2e11e7ed575aade57924f71d17b49002a29333709abf5f9471ba57824841efbe3c1298276a21f30857eb529a8246d4b0b0d05f2066b01.css" integrity="sha512-rg5P8cUjsqQK4uEeftV1qt5Xkk9x0XtJACopMzcJq/X5RxuleCSEHvvjwSmCdqIfMIV&#43;tSmoJG1LCw0F8gZrAQ==" />
+  
+</head>
+<body a="auto">
+        <main class="page-content" aria-label="Content">
+            <div class="w">
+<a href="/">..</a>
+
+
+<article>
+    <p class="post-meta">
+        <time datetime="2024-12-08 13:56:56 &#43;0200 &#43;0200">
+            2024-12-08
+        </time>
+    </p>
+
+    <h1>Reverse Enginnering the BasicFit QRCode</h1>
+
+    
+
+    <h2 id="introduction">Introduction</h2>
+<p>BasicFit est une chaine de salle de sport mondiale qui propose un système d&rsquo;accès aux salles par QRcode.</p>
+<p>Les QRcode changent toutes les 7 secondes et les screens et enregistrements d&rsquo;écran sont bloqués, afin de permettre l&rsquo;accès à la salle de sport depuis seulement un unique appareil.
+Dans cet article nous allons voir comment il est possible de trouver l&rsquo;algorithme de génération des QRcode afin de le répliquer en dehors de l&rsquo;application mobile.</p>
+<h2 id="avertissement">Avertissement</h2>
+<p>Les informations et techniques présentées dans cet article sont fournies à des fins éducatives uniquement. Je décline toute responsabilité quant à l&rsquo;utilisation de ces informations à des fins autres que celles de l&rsquo;apprentissage et de la compréhension. Veuillez respecter toutes les lois et règlements applicables.</p>
+<h2 id="analyse-du-qrcode">Analyse du QRcode</h2>
+<p>Après avoir scanné un QRcode et avoir récupéré le texte qui se trouve à l&rsquo;intérieur, voila ce que nous obtenons :</p>
+<p><code>gm2:V001111111:2DQ:1731690331:02F19709</code></p>
+<ul>
+<li><code>gm2</code>: ne change jamais (surement pour indiquer au serveur de basic fit que c&rsquo;est un QRcode d&rsquo;accès)</li>
+<li><code>V001111111</code>: le numéro de ma carte d&rsquo;abonnement BasicFit</li>
+<li><code>2DQ</code>: aucune idée pour l&rsquo;instant</li>
+<li><code>1731690331</code>: semble être un timestamp (logique étant donné que le QRcode change toutes les 7 secondes)</li>
+<li><code>02F19709</code>: aucune idée pour l&rsquo;instant</li>
+</ul>
+<h2 id="analyse-des-requêtes-http-lors-de-la-génération-de-qrcode">Analyse des requêtes HTTP lors de la génération de QRcode</h2>
+<p>Sur IOS on peut utiliser cette application : <a href="https://apps.apple.com/fr/app/http-catcher/id1445874902">HTTP CATCHER</a> pour analyser les requêtes HTTP(s) et on remarque que cette requête est répétée toutes les 2/3 secondes :</p>
+<pre tabindex="0"><code>GET /api/AccessControlResult?comId=2DQ&amp;card=QV001111111 HTTP/1.1
+</code></pre><p>La réponse est vide tant que le QRcode n&rsquo;a pas été scanné à la salle de sport, on en déduit que c&rsquo;est une requête qui permet à l&rsquo;application de savoir quand l&rsquo;utilisateur a scanné le QRcode pour lui afficher le message &ldquo;Bonne séance&rdquo;.</p>
+<p>On sait maintenant que <code>2DQ</code> est un identifiant surement généré aléatoirement pour éviter que l&rsquo;application ne détecte un scan de QRcode d&rsquo;un autre jour.</p>
+<h2 id="analyse-de-lapk-basicfit">Analyse de l&rsquo;APK BasicFit</h2>
+<p>On peut déjà décompresser l&rsquo;application en utilisant la commande <code>apktool d com.basicfit.trainingApp.apk</code></p>
+<p>Lien de apktool : <a href="https://apktool.org/">apktool.org</a></p>
+<p>On remarque dans les fichiers de l&rsquo;application que dans le dossier <code>assets</code> se trouve un fichier <code>index.android.bundle</code>, ce qui nous indique que c&rsquo;est une application <code>React Native</code>.</p>
+<p>Ce fichier est le Javascript packagé de l&rsquo;application :</p>
+<ul>
+<li>Il est généré par Metro bundler, l&rsquo;outil de React Native pour packager le code.</li>
+<li>Il est chargé à l’exécution par le moteur JavaScript intégré dans l’application (souvent Hermes ou JSC, selon la configuration).</li>
+<li>Dans notre cas c&rsquo;est Hermes</li>
+</ul>
+<p>On utilise donc <a href="https://github.com/P1sec/hermes-dec">hermes-dec</a> pour désassembler le bytecode de l&rsquo;application avec la commande :</p>
+<pre tabindex="0"><code>hbc-disassembler assets/index.android.bundle /output.hasm
+</code></pre><p>En ouvrant le fichier <code>output.hasm</code> et après quelques recherches, on tombe sur cette fonction :</p>
+<p><img src="/images/basic_1.png" alt=""></p>
+<p>A la fin de la fonction on peut voir le string suivant :</p>
+<p><img src="/images/basic_2.png" alt=""></p>
+<p>On sait donc que c&rsquo;est cette fonction qui s&rsquo;occupe de générer le QRcode.</p>
+<p>On retrouve notamment le string GM2 ainsi que le numéro de carte, le séparateur, etc&hellip;</p>
+<p><img src="/images/basic_4.png" alt=""></p>
+<p>En fouillant un peu plus dans la fonction on peut voir un petit algorithme de chiffrement en <code>SHA256</code> avec une conversion en <code>HEX</code>, ainsi qu&rsquo;une fonction <code>substring</code> appliquée avec comme paramètre 8.</p>
+<p>On peut voir que le device identifier joue un role dans le chiffrement, c&rsquo;est celui de mon appareil qui sert à générer le QRcode d&rsquo;accès, car ce QRcode est limité à un seul appareil.</p>
+<p>En analysant les requêtes HTTP lors du lancement de l&rsquo;application on peut voir qu&rsquo;il y a une API qui répond avec mes informations et notamment mon device identifier :</p>
+<p><img src="/images/basic_5.png" alt=""></p>
+<p>Ce qui la fonction appelle <code>guid</code> c&rsquo;est les 3 caractères aléatoire générés au lancement pour éviter les collisions de session, dans notre cas il s&rsquo;agit de <code>2DQ</code>.</p>
+<p>Le chiffrement s&rsquo;effectue comme suit :</p>
+<ul>
+<li>Le numéro de carte, le guid, le timestamp (iat) et le device identifier sont concaténés pour former une chaine de caractère</li>
+<li>Cette chaine est hashée en sha256 en format de sortie hexadécimal</li>
+<li>8 caractères sont extraits de ce hash</li>
+</ul>
+<p>Si on essaye de reproduire ce chiffrement avec nos données on obtient ceci :</p>
+<p><img src="/images/basic_6.png" alt=""></p>
+<p>Je rappelle qu&rsquo;au début, nous avions ces informations dans notre QRcode :</p>
+<p><code>gm2:V001111111:2DQ:1731690331:02F19709</code></p>
+<p>Et on remarque que les 8 derniers caractères du hash obtenu grâce à l&rsquo;algorithme correspondent à notre donnée manquante :</p>
+<ul>
+<li>hash : ac7727ec41c64ed0f4e40b47796b59500dec66e83eb6651510eabc040<code>2f19709</code></li>
+<li>donnée manquante : <code>02F19709</code></li>
+</ul>
+<p>Nous avons donc tous les élements pour pouvoir récréer un QRcode sans être sur le bon appareil.</p>
+<h2 id="étapes-de-reproduction-du-qrcode">Étapes de reproduction du QRcode</h2>
+<p>Au début de l&rsquo;algorithme :</p>
+<ul>
+<li>On récupère notre device identifier lié à notre compte</li>
+<li>On génère 3 caractères aléatoires qu&rsquo;on utilisera comme guid</li>
+<li>On récupère notre numéro de carte basicfit</li>
+</ul>
+<p>Et ensuite toutes les 7 secondes on applique cet algorithme :</p>
+<ul>
+<li>On récupère le timestamp actuel</li>
+<li>On concatène le numéro de carte, le guid, le timestamp et le device identifier</li>
+<li>On applique un chiffrement sha256 sur cette chaine</li>
+<li>On récupère les 8 derniers caractères du hash, qu&rsquo;on appelera result</li>
+<li>On génère un QRcode avec les données formattées comme suit : <code>gm2:card_number:guid:timestamp:result</code></li>
+</ul>
+<p>Et voila ! On peut désormais générer un QRcode d&rsquo;accès valide sans utiliser l&rsquo;application BasicFit.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>Pour la conclusion je vous donne un petit code python qui correspond à l&rsquo;algorithme :</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-py" data-lang="py"><span style="display:flex;"><span><span style="color:#f92672">import</span> qrcode
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> hashlib
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> time
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> random
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> string
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> base64
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> io <span style="color:#f92672">import</span> BytesIO
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">generate_random_code</span>():
+</span></span><span style="display:flex;"><span>    characters <span style="color:#f92672">=</span> string<span style="color:#f92672">.</span>ascii_uppercase <span style="color:#f92672">+</span> string<span style="color:#f92672">.</span>digits
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#39;&#39;</span><span style="color:#f92672">.</span>join(random<span style="color:#f92672">.</span>choices(characters, k<span style="color:#f92672">=</span><span style="color:#ae81ff">3</span>))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">generate_qrcode</span>(card_id, device_identifier):
+</span></span><span style="display:flex;"><span>    random_code <span style="color:#f92672">=</span> generate_random_code()
+</span></span><span style="display:flex;"><span>    timestamp <span style="color:#f92672">=</span> str(int(time<span style="color:#f92672">.</span>time()))
+</span></span><span style="display:flex;"><span>    content <span style="color:#f92672">=</span> card_id <span style="color:#f92672">+</span> random_code <span style="color:#f92672">+</span> timestamp <span style="color:#f92672">+</span> device_identifier
+</span></span><span style="display:flex;"><span>    hash_object <span style="color:#f92672">=</span> hashlib<span style="color:#f92672">.</span>sha256(content<span style="color:#f92672">.</span>encode(<span style="color:#e6db74">&#39;utf-8&#39;</span>))
+</span></span><span style="display:flex;"><span>    hex_dig <span style="color:#f92672">=</span> hash_object<span style="color:#f92672">.</span>hexdigest()
+</span></span><span style="display:flex;"><span>    hex_obj <span style="color:#f92672">=</span> hex_dig[<span style="color:#f92672">-</span><span style="color:#ae81ff">8</span>:]
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#e6db74">&#34;gm2:&#34;</span> <span style="color:#f92672">+</span> card_id <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;:&#34;</span> <span style="color:#f92672">+</span> random_code <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;:&#34;</span> <span style="color:#f92672">+</span> timestamp <span style="color:#f92672">+</span> <span style="color:#e6db74">&#34;:&#34;</span> <span style="color:#f92672">+</span> hex_obj<span style="color:#f92672">.</span>upper()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>cardID <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;V01111111&#34;</span> <span style="color:#75715e"># Remplacer par le numéro de carte basicfit</span>
+</span></span><span style="display:flex;"><span>deviceID <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;d8af1441-19a8-4a9c-8406-0867b6674cba&#34;</span> <span style="color:#75715e"># Remplacer par votre device identifier</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>qr <span style="color:#f92672">=</span> qrcode<span style="color:#f92672">.</span>QRCode(
+</span></span><span style="display:flex;"><span>        version<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>        error_correction<span style="color:#f92672">=</span>qrcode<span style="color:#f92672">.</span>constants<span style="color:#f92672">.</span>ERROR_CORRECT_L,
+</span></span><span style="display:flex;"><span>        box_size<span style="color:#f92672">=</span><span style="color:#ae81ff">10</span>,
+</span></span><span style="display:flex;"><span>        border<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>,
+</span></span><span style="display:flex;"><span>    )
+</span></span><span style="display:flex;"><span>qr<span style="color:#f92672">.</span>add_data(generate_qrcode(cardID, deviceID))
+</span></span><span style="display:flex;"><span>qr<span style="color:#f92672">.</span>make(fit<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>img <span style="color:#f92672">=</span> qr<span style="color:#f92672">.</span>make_image(fill_color<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;black&#34;</span>, back_color<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;white&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>buffer <span style="color:#f92672">=</span> BytesIO()
+</span></span><span style="display:flex;"><span>img<span style="color:#f92672">.</span>save(buffer, format<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;PNG&#34;</span>)
+</span></span><span style="display:flex;"><span>buffer<span style="color:#f92672">.</span>seek(<span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Obtenir l&#39;image du QRcode en base64</span>
+</span></span><span style="display:flex;"><span>qr_code_base64 <span style="color:#f92672">=</span> base64<span style="color:#f92672">.</span>b64encode(buffer<span style="color:#f92672">.</span>getvalue())<span style="color:#f92672">.</span>decode(<span style="color:#e6db74">&#34;utf-8&#34;</span>)
+</span></span><span style="display:flex;"><span>print(qr_code_base64)
+</span></span></code></pre></div><p>J&rsquo;espère que vous avez apprécié cet article.</p>
+
+</article>
+
+            </div>
+        </main>
+    </body></html>

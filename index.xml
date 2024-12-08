@@ -6,8 +6,15 @@
     <description>Recent content on L0tus Blog</description>
     <generator>Hugo</generator>
     <language>en-us</language>
-    <lastBuildDate>Tue, 17 Sep 2024 12:26:56 +0200</lastBuildDate>
+    <lastBuildDate>Sun, 08 Dec 2024 13:56:56 +0200</lastBuildDate>
     <atom:link href="https://l0tus77.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Reverse Enginnering the BasicFit QRCode</title>
+      <link>https://l0tus77.github.io/posts/basicfit/</link>
+      <pubDate>Sun, 08 Dec 2024 13:56:56 +0200</pubDate>
+      <guid>https://l0tus77.github.io/posts/basicfit/</guid>
+      <description>&lt;h2 id=&#34;introduction&#34;&gt;Introduction&lt;/h2&gt;&#xA;&lt;p&gt;BasicFit est une chaine de salle de sport mondiale qui propose un système d&amp;rsquo;accès aux salles par QRcode.&lt;/p&gt;&#xA;&lt;p&gt;Les QRcode changent toutes les 7 secondes et les screens et enregistrements d&amp;rsquo;écran sont bloqués, afin de permettre l&amp;rsquo;accès à la salle de sport depuis seulement un unique appareil.&#xA;Dans cet article nous allons voir comment il est possible de trouver l&amp;rsquo;algorithme de génération des QRcode afin de le répliquer en dehors de l&amp;rsquo;application mobile.&lt;/p&gt;</description>
+    </item>
     <item>
       <title>Reverse Enginnering the AWS WAF Challenge</title>
       <link>https://l0tus77.github.io/posts/awsreverse/</link>
